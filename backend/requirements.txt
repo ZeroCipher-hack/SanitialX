@@ -28,3 +28,4 @@ PyJWT>=2.8,<3.0
 pytest>=7.0,<10.0
 pytest-asyncio>=0.21,<1.0
 async-asgi-testclient>=1.4,<2.0
+fakeredis>=2.26,<3.0
