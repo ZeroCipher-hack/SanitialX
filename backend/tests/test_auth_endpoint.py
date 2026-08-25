@@ -10,6 +10,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timezone
 
+import fakeredis.aioredis
 import pytest
 from async_asgi_testclient import TestClient
 
@@ -35,7 +36,7 @@ async def client():
         DATABASE_URL="sqlite+aiosqlite:///:memory:",
         jwt_secret_key=_TEST_JWT_SECRET,
         api_key=_TEST_API_KEY,
-        redis_url="redis://localhost:6380/0",  # matches docker-compose.test.yml redis-test
+        redis_url="redis://localhost:6379/0",  # overridden with in-memory fakeredis below
     )
     db_mgr = DatabaseSessionManager(settings.DATABASE_URL)
     db_mgr.init()
@@ -43,6 +44,7 @@ async def client():
         await conn.run_sync(Base.metadata.create_all)
 
     container = ApplicationContainer(settings=settings, db_manager=db_mgr)
+    container.redis_client = fakeredis.aioredis.FakeRedis(decode_responses=True)
     app.state.container = container
     app.state.is_ready = True
 
@@ -61,9 +63,7 @@ async def client():
     async with TestClient(app) as test_client:
         yield test_client
 
-    # Clean up any rate-limit / revocation keys this test wrote, so test
-    # runs don't bleed into each other via the shared test Redis instance.
-    await container.redis_client.flushdb()
+    await container.redis_client.aclose()
     await db_mgr.close()
 
 
