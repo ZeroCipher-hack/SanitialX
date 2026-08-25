@@ -4,27 +4,28 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 import pytest
+import fakeredis.aioredis
 from async_asgi_testclient import TestClient
 
 from core.config import Settings
 from core.container import ApplicationContainer
 from core.security import create_access_token
 from db.base import Base
-from db.repositories.incident_repository import PostgresIncidentRepository
-from db.repositories.rule_repository import PostgresDetectionRuleRepository
 from db.session import DatabaseSessionManager
 from main import app
 
 
 @pytest.fixture
 async def client():
-    # Use SQLite in-memory for testing API endpoints against database
+    # Use SQLite in-memory for testing API endpoints against database and
+    # fakeredis for Redis-backed authentication concerns. Tests must not
+    # depend on a host Redis daemon or a published Docker port.
     settings = Settings(
         ENVIRONMENT="testing",
         DATABASE_URL="sqlite+aiosqlite:///:memory:",
         jwt_secret_key="test-only-jwt-secret-" + "x" * 20,
         api_key="test-only-api-key-" + "x" * 20,
-        redis_url="redis://localhost:6380/0",
+        redis_url="redis://localhost:6379/0",
     )
     db_mgr = DatabaseSessionManager(settings.DATABASE_URL)
     db_mgr.init()
@@ -32,12 +33,14 @@ async def client():
         await conn.run_sync(Base.metadata.create_all)
 
     container = ApplicationContainer(settings=settings, db_manager=db_mgr)
+    container.redis_client = fakeredis.aioredis.FakeRedis(decode_responses=True)
     app.state.container = container
     app.state.is_ready = True
 
     async with TestClient(app) as test_client:
         yield test_client
 
+    await container.redis_client.aclose()
     await db_mgr.close()
 
 
