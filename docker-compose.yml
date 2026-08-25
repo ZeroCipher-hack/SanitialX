@@ -1,0 +1,114 @@
+services:
+  # ── PostgreSQL Database ───────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: sentinelx-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-sentinelx}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-sentinelx_password_change_me}
+      POSTGRES_DB: ${POSTGRES_DB:-sentinelx}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-sentinelx} -d ${POSTGRES_DB:-sentinelx}"]
+      interval: 3s
+      timeout: 3s
+      retries: 5
+
+  # ── Redis Event Bus ───────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: sentinelx-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 3s
+      retries: 5
+
+  # ── One-Shot Alembic Database Migration ──────────────────────────────────
+  migrate:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: sentinelx-migrate
+    command: alembic upgrade head
+    environment:
+      SENTINELX_DATABASE_URL: ${SENTINELX_DATABASE_URL:-postgresql+asyncpg://sentinelx:sentinelx_password_change_me@postgres:5432/sentinelx}
+      # get_settings() now requires these two on every boot path, including
+      # this one-shot migration container — without them Settings() raises
+      # and the migration never runs. Must come from the root .env file.
+      SENTINELX_API_KEY: ${SENTINELX_API_KEY:?SENTINELX_API_KEY must be set in .env}
+      SENTINELX_JWT_SECRET_KEY: ${SENTINELX_JWT_SECRET_KEY:?SENTINELX_JWT_SECRET_KEY must be set in .env}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # ── SentinelX FastAPI Backend API Server ──────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: sentinelx-backend
+    restart: unless-stopped
+    command: uvicorn main:create_app --factory --host 0.0.0.0 --port 8000
+    ports:
+      - "${SENTINELX_API_PORT:-8000}:8000"
+    environment:
+      SENTINELX_APP_NAME: ${SENTINELX_APP_NAME:-SentinelX}
+      SENTINELX_ENVIRONMENT: ${SENTINELX_ENVIRONMENT:-production}
+      SENTINELX_LOG_LEVEL: ${SENTINELX_LOG_LEVEL:-INFO}
+      SENTINELX_REDIS_URL: ${SENTINELX_REDIS_URL:-redis://redis:6379/0}
+      SENTINELX_DATABASE_URL: ${SENTINELX_DATABASE_URL:-postgresql+asyncpg://sentinelx:sentinelx_password_change_me@postgres:5432/sentinelx}
+      SENTINELX_API_HOST: 0.0.0.0
+      SENTINELX_API_PORT: 8000
+      SENTINELX_API_KEY: ${SENTINELX_API_KEY:?SENTINELX_API_KEY must be set in .env}
+      SENTINELX_JWT_SECRET_KEY: ${SENTINELX_JWT_SECRET_KEY:?SENTINELX_JWT_SECRET_KEY must be set in .env}
+      SENTINELX_JWT_ALGORITHM: ${SENTINELX_JWT_ALGORITHM:-HS256}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
+  # ── SentinelX Background Correlation Worker ──────────────────────────────
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: sentinelx-worker
+    restart: unless-stopped
+    # scripts/run_worker.py attaches the Redis event bus before starting the
+    # correlation worker — a bare ApplicationContainer has no event bus
+    # attached (event_bus=None), which left correlation_worker as None and
+    # made the previous inline command crash with AttributeError.
+    command: python scripts/run_worker.py
+    environment:
+      SENTINELX_APP_NAME: ${SENTINELX_APP_NAME:-SentinelX}
+      SENTINELX_ENVIRONMENT: ${SENTINELX_ENVIRONMENT:-production}
+      SENTINELX_LOG_LEVEL: ${SENTINELX_LOG_LEVEL:-INFO}
+      SENTINELX_REDIS_URL: ${SENTINELX_REDIS_URL:-redis://redis:6379/0}
+      SENTINELX_DATABASE_URL: ${SENTINELX_DATABASE_URL:-postgresql+asyncpg://sentinelx:sentinelx_password_change_me@postgres:5432/sentinelx}
+      SENTINELX_API_KEY: ${SENTINELX_API_KEY:?SENTINELX_API_KEY must be set in .env}
+      SENTINELX_JWT_SECRET_KEY: ${SENTINELX_JWT_SECRET_KEY:?SENTINELX_JWT_SECRET_KEY must be set in .env}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
+volumes:
+  postgres_data:
+  redis_data:

@@ -1,0 +1,1 @@
+# SentinelX Detection Rules Package
