@@ -1,4 +1,4 @@
-# SentinelX Backend Production Dependencies
+# SanitialX Backend Production Dependencies
 
 # Core & Settings
 pydantic>=2.0,<3.0
@@ -11,7 +11,7 @@ scapy>=2.5,<3.0
 redis>=5.0,<6.0
 
 # Database & ORM
-sqlalchemy>=2.0,<3.0
+sqlalchemy==2.0.52
 asyncpg>=0.29,<1.0
 aiosqlite>=0.19,<1.0
 alembic>=1.12,<2.0
