@@ -94,6 +94,7 @@ async def update_incident_status(
         updated = await service.transition_status(
             incident_id=incident_id,
             new_status=payload.status,
+            expected_version=payload.expected_version,
         )
         return IncidentResponse(
             incident_id=updated.incident_id,

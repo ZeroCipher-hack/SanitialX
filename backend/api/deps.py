@@ -1,21 +1,23 @@
 """
-FastAPI Dependencies for SentinelX.
+FastAPI Dependencies for SanitialX.
 
-Provides container injection, service access, and JWT Bearer authorization.
+Provides container injection, service access, database session injection, and JWT Bearer authorization.
 """
 
 from __future__ import annotations
 
-from typing import Annotated, Sequence
+from typing import Annotated, Sequence, AsyncGenerator
 
 import jwt
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.container import ApplicationContainer
 from core.security import TokenPayload, decode_access_token
 from db.repositories.rule_repository import PostgresDetectionRuleRepository
 from db.repositories.user_repository import PostgresUserRepository
+from db.repositories.incident_repository import PostgresIncidentRepository
 from incidents.service import IncidentService
 
 security_scheme = HTTPBearer(auto_error=False)
@@ -32,10 +34,24 @@ def get_container(request: Request) -> ApplicationContainer:
     return container
 
 
+async def get_db_session(
+    container: Annotated[ApplicationContainer, Depends(get_container)],
+) -> AsyncGenerator[AsyncSession, None]:
+    """Provide async database session from container db_manager."""
+    async for session in container.db_manager.session():
+        yield session
+
+
 def get_incident_service(
     container: Annotated[ApplicationContainer, Depends(get_container)],
 ) -> IncidentService:
     return container.incident_service
+
+
+def get_incident_repository(
+    container: Annotated[ApplicationContainer, Depends(get_container)],
+) -> PostgresIncidentRepository:
+    return container.incident_repository
 
 
 def get_rule_repository(
@@ -54,11 +70,7 @@ async def get_current_user(
     credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(security_scheme)],
     container: Annotated[ApplicationContainer, Depends(get_container)],
 ) -> TokenPayload:
-    """Decode and validate JWT Bearer token from HTTP Authorization header.
-
-    Also rejects tokens whose jti has been revoked (e.g. via /auth/logout),
-    even if the JWT signature and expiry are still valid.
-    """
+    """Decode and validate JWT Bearer token from HTTP Authorization header."""
     if credentials is None or credentials.scheme.lower() != "bearer":
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

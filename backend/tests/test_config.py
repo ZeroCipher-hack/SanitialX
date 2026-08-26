@@ -91,4 +91,4 @@ class TestInsecureSecretsRejected:
         monkeypatch.delenv("SENTINELX_JWT_SECRET_KEY", raising=False)
         monkeypatch.setenv("SENTINELX_API_KEY", _VALID_SECRET)
         with pytest.raises(Exception):
-            Settings()
+            Settings(_env_file=None)

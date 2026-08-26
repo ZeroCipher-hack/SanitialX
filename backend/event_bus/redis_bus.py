@@ -37,6 +37,9 @@ def create_redis_client(url: str) -> aioredis.Redis:  # type: ignore[type-arg]
     This function exists so that callers never need `import redis`
     themselves — this module remains the sole permitted import site.
     """
+    if url.startswith("fakeredis://"):
+        import fakeredis.aioredis
+        return fakeredis.aioredis.FakeRedis(decode_responses=True)
     return aioredis.from_url(url, decode_responses=True)
 
 

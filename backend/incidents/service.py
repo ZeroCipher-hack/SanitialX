@@ -65,6 +65,7 @@ class IncidentService:
         self,
         incident_id: str,
         new_status: IncidentStatus,
+        expected_version: int | None = None,
     ) -> Incident:
         """Transition an incident to a new status.
 
@@ -93,7 +94,7 @@ class IncidentService:
 
         # Construct updated immutable Incident with incremented version
         now = datetime.now(timezone.utc)
-        expected_version = current.version
+        ver_check = expected_version if expected_version is not None else current.version
         updated_model = Incident(
             incident_id=current.incident_id,
             title=current.title,
@@ -109,4 +110,4 @@ class IncidentService:
             context=current.context,
         )
 
-        return await self._repository.update(updated_model, expected_version=expected_version)
+        return await self._repository.update(updated_model, expected_version=ver_check)

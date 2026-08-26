@@ -49,11 +49,22 @@ def _orm_to_domain(orm: IncidentORM) -> Incident:
 class PostgresIncidentRepository(IncidentRepository):
     """Postgres / SQLAlchemy implementation of IncidentRepository."""
 
-    def __init__(self, session_factory: async_sessionmaker[AsyncSession]) -> None:
+    def __init__(self, session_factory: async_sessionmaker[AsyncSession] | AsyncSession) -> None:
         self._session_factory = session_factory
 
+    def _get_session(self):
+        from contextlib import asynccontextmanager
+        @asynccontextmanager
+        async def _ctx():
+            if isinstance(self._session_factory, AsyncSession):
+                yield self._session_factory
+            else:
+                async with self._session_factory() as s:
+                    yield s
+        return _ctx()
+
     async def create(self, incident: Incident) -> Incident:
-        async with self._session_factory() as session:
+        async with self._get_session() as session:
             orm = IncidentORM(
                 incident_id=incident.incident_id,
                 title=incident.title,
@@ -74,7 +85,7 @@ class PostgresIncidentRepository(IncidentRepository):
             return _orm_to_domain(orm)
 
     async def get_by_id(self, incident_id: str) -> Incident | None:
-        async with self._session_factory() as session:
+        async with self._get_session() as session:
             result = await session.execute(
                 select(IncidentORM).where(IncidentORM.incident_id == incident_id)
             )
@@ -88,7 +99,7 @@ class PostgresIncidentRepository(IncidentRepository):
 
         Executes UPDATE ... WHERE incident_id = :id AND version = :expected_version.
         """
-        async with self._session_factory() as session:
+        async with self._get_session() as session:
             stmt = (
                 update(IncidentORM)
                 .where(
@@ -134,7 +145,7 @@ class PostgresIncidentRepository(IncidentRepository):
             return _orm_to_domain(updated_orm)
 
     async def list_all(self, limit: int = 100, offset: int = 0) -> list[Incident]:
-        async with self._session_factory() as session:
+        async with self._get_session() as session:
             stmt = (
                 select(IncidentORM)
                 .order_by(IncidentORM.created_at.desc())

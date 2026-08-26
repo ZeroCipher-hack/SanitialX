@@ -67,6 +67,13 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         # Attach container to app state
         app.state.container = container
 
+    # Auto-create DB tables if needed
+    try:
+        await container.db_manager.create_tables()
+        logger.info("Verified/created database schema tables.")
+    except Exception as exc:
+        logger.warning("Database schema create_tables note: %s", exc)
+
     # 4. Start Sensors
     try:
         await container.sensor_manager.start_all()

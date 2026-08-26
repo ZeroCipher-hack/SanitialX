@@ -41,6 +41,13 @@ class DatabaseSessionManager:
             autoflush=False,
         )
 
+    async def create_tables(self) -> None:
+        if self._engine is not None:
+            from db.base import Base
+            import db.models  # noqa: F401
+            async with self._engine.begin() as conn:
+                await conn.run_sync(Base.metadata.create_all)
+
     async def close(self) -> None:
         if self._engine is not None:
             await self._engine.dispose()

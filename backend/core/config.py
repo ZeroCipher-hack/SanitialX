@@ -58,6 +58,10 @@ class Settings(BaseSettings):
     environment: str = Field(default="development", description="Execution environment")
     api_host: str = Field(default="0.0.0.0", description="API listen host")
     api_port: int = Field(default=8000, description="API listen port")
+    frontend_origin: str = Field(
+        default="http://localhost:3000,http://127.0.0.1:3000",
+        description="Allowed CORS frontend origins (comma-separated)",
+    )
 
     # No defaults for secrets anymore — Settings() will raise a clear
     # pydantic ValidationError at boot if these env vars are unset, instead
