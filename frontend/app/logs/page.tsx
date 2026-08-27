@@ -26,7 +26,7 @@ export default function LogsPage() {
       {events.length === 0 && !loading ? <div className="empty">Hozircha log/hodisa topilmadi.</div> : events.map((event, i) => <div className="log-line" key={event.event_id || i}>
         <span className="log-time">{String(event.timestamp || '').replace('T',' ').slice(0,19)}</span>
         <span className="log-level">{event.severity || 'INFO'}</span>
-        <span className="log-message">{event.event_type || event.description || JSON.stringify(event)}</span>
+        <span className="log-message">{event.event_type || event.details || JSON.stringify(event)}</span>
       </div>)}
     </section>
     <div className="guide-card" style={{marginTop:12}}><h3>Izoh</h3><p>Bu sahifa hozirgi <code>/events</code> telemetry oqimini log ko‘rinishida beradi. Keyingi backend bosqichida Django application/security loglarini alohida saqlash va qidirish pipeline'i qo‘shiladi.</p></div>
