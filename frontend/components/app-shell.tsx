@@ -37,18 +37,35 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const notifRef = useRef<HTMLDivElement>(null);
 
   const loadNotifications = () => {
+    if (typeof window === 'undefined') return;
+
+    const token = localStorage.getItem('access_token');
+    if (!token) {
+      setIncidents([]);
+      return;
+    }
+
     api<Incident[]>('/incidents?limit=50')
       .then((data) => {
-        setIncidents(data.filter((x) => x.severity === 'CRITICAL' || x.severity === 'HIGH'));
+        setIncidents(
+          data.filter(
+            (x) => x.severity === 'CRITICAL' || x.severity === 'HIGH'
+          )
+        );
       })
-      .catch(() => {});
+      .catch(() => {
+        setIncidents([]);
+      });
   };
 
   useEffect(() => {
+    if (pathname === '/login') return;
+
     loadNotifications();
+
     const interval = setInterval(loadNotifications, 15000);
     return () => clearInterval(interval);
-  }, []);
+  }, [pathname]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
