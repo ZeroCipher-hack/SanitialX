@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import logging
 from typing import AsyncGenerator
+from urllib.parse import urlsplit, urlunsplit
 
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
@@ -17,11 +18,24 @@ from sqlalchemy.ext.asyncio import (
 logger = logging.getLogger(__name__)
 
 
+def _normalize_database_url(database_url: str) -> str:
+    """Normalize common hosted PostgreSQL URLs for SQLAlchemy async usage.
+
+    Render commonly exposes DATABASE_URL as ``postgresql://`` or
+    ``postgres://``. SQLAlchemy's async engine must use the asyncpg dialect;
+    otherwise it attempts to import the synchronous psycopg2 driver.
+    """
+    parts = urlsplit(database_url)
+    if parts.scheme in {"postgres", "postgresql"}:
+        return urlunsplit(("postgresql+asyncpg", parts.netloc, parts.path, parts.query, parts.fragment))
+    return database_url
+
+
 class DatabaseSessionManager:
     """Manages async SQLAlchemy engine lifecycle and session creation."""
 
     def __init__(self, database_url: str, echo: bool = False) -> None:
-        self._database_url = database_url
+        self._database_url = _normalize_database_url(database_url)
         self._echo = echo
         self._engine: AsyncEngine | None = None
         self._sessionmaker: async_sessionmaker[AsyncSession] | None = None
