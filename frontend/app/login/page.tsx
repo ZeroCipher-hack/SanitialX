@@ -42,9 +42,9 @@ export default function LoginPage() {
 
   return (
     <div className="login-page">
-      <div className="login-glow" />
+      <div className="login-glow" style={{ pointerEvents: 'none' }} />
 
-      <div className="login-card">
+      <div className="login-card" style={{ zIndex: 1 }}>
         <div className="login-brand">
           <div className="brand-mark">
             <Shield size={22} />
