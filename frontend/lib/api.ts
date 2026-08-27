@@ -37,19 +37,23 @@ export async function api<T>(endpoint: string, options: RequestInit = {}): Promi
 }
 
 export async function login(username: string, password: string): Promise<string> {
-  const res = await fetch(`${API_BASE}/auth/login`, {
+  const res = await fetch(`${API_BASE}/auth/token`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ username, password }),
   });
+
   if (!res.ok) {
     const errData = await res.json().catch(() => ({ detail: res.statusText }));
     throw new Error(errData.detail || 'Authentication failed');
   }
+
   const data = await res.json();
+
   if (typeof window !== 'undefined') {
     localStorage.setItem('access_token', data.access_token);
   }
+
   return data.access_token;
 }
 
