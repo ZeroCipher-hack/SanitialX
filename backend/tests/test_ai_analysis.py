@@ -44,11 +44,11 @@ def test_settings_load_gemini_configuration() -> None:
     settings = Settings(
         **_TEST_SECRET_KWARGS,
         gemini_api_key="test-gemini-key",
-        gemini_model="gemini-2.5-flash",
+        gemini_model="gemini-3.6-flash",
     )
 
     assert settings.gemini_api_key == "test-gemini-key"
-    assert settings.gemini_model == "gemini-2.5-flash"
+    assert settings.gemini_model == "gemini-3.6-flash"
 
 
 def test_analyze_incident_accepts_structured_response() -> None:
@@ -69,7 +69,7 @@ def test_analyze_incident_accepts_structured_response() -> None:
 
     with patch("services.ai_analysis.genai.Client", return_value=fake_client):
         result = analyze_incident(
-            make_incident(), api_key="test-gemini-key", model="gemini-2.5-flash"
+            make_incident(), api_key="test-gemini-key", model="gemini-3.6-flash"
         )
 
     assert result.overall_risk_score == 78
