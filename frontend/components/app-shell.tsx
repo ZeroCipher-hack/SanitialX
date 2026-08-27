@@ -164,7 +164,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <div className="rail-section-title"><Bot size={14} /> AI tahlil</div>
               <div className="ai-status-box">
                 <span className="ai-status-dot" />
-                <div><b>Tayyorlanmoqda</b><small>AI API kaliti ulanmagan</small></div>
+                <div><b>Gemini AI</b><small>Server orqali ulangan</small></div>
               </div>
               <Link href="/ai-analysis" className="rail-ai-link">AI modulini ochish <ChevronRight size={13} /></Link>
             </div>
