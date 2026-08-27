@@ -4,9 +4,10 @@ Postgres implementation of DetectionRuleRepository interface.
 
 from __future__ import annotations
 
-from typing import Any, Sequence
+from datetime import datetime, timezone
+from typing import Any
 
-from sqlalchemy import select, update
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from db.models.rule import DetectionRuleORM
@@ -30,6 +31,7 @@ class PostgresDetectionRuleRepository:
         async with self._session_factory() as session:
             stmt = select(DetectionRuleORM).where(DetectionRuleORM.rule_id == rule_id)
             existing = (await session.execute(stmt)).scalar_one_or_none()
+            now = datetime.now(timezone.utc)
 
             if existing is None:
                 orm = DetectionRuleORM(
@@ -39,6 +41,8 @@ class PostgresDetectionRuleRepository:
                     severity=severity,
                     enabled=enabled,
                     parameters=parameters or {},
+                    created_at=now,
+                    updated_at=now,
                 )
                 session.add(orm)
             else:
@@ -46,7 +50,8 @@ class PostgresDetectionRuleRepository:
                 existing.severity = severity
                 existing.description = description
                 existing.enabled = enabled
-                existing.parameters = parameters or {}
+                existing.parameters = parameters if parameters is not None else existing.parameters
+                existing.updated_at = now
 
             await session.commit()
 
@@ -56,31 +61,28 @@ class PostgresDetectionRuleRepository:
             orm = (await session.execute(stmt)).scalar_one_or_none()
             if orm is None:
                 return None
-            return {
-                "rule_id": orm.rule_id,
-                "rule_name": orm.rule_name,
-                "description": orm.description,
-                "severity": orm.severity,
-                "enabled": orm.enabled,
-                "parameters": orm.parameters,
-                "created_at": orm.created_at,
-                "updated_at": orm.updated_at,
-            }
+            return self._to_dict(orm)
 
     async def list_rules(self, limit: int = 100, offset: int = 0) -> list[dict[str, Any]]:
         async with self._session_factory() as session:
-            stmt = select(DetectionRuleORM).limit(limit).offset(offset)
+            stmt = (
+                select(DetectionRuleORM)
+                .order_by(DetectionRuleORM.rule_id.asc())
+                .limit(limit)
+                .offset(offset)
+            )
             orms = (await session.execute(stmt)).scalars().all()
-            return [
-                {
-                    "rule_id": o.rule_id,
-                    "rule_name": o.rule_name,
-                    "description": o.description,
-                    "severity": o.severity,
-                    "enabled": o.enabled,
-                    "parameters": o.parameters,
-                    "created_at": o.created_at,
-                    "updated_at": o.updated_at,
-                }
-                for o in orms
-            ]
+            return [self._to_dict(o) for o in orms]
+
+    @staticmethod
+    def _to_dict(orm: DetectionRuleORM) -> dict[str, Any]:
+        return {
+            "rule_id": orm.rule_id,
+            "rule_name": orm.rule_name,
+            "description": orm.description,
+            "severity": orm.severity,
+            "enabled": orm.enabled,
+            "parameters": orm.parameters or {},
+            "created_at": orm.created_at,
+            "updated_at": orm.updated_at,
+        }
