@@ -116,6 +116,7 @@ export interface InvestigationReport {
   updated_at: string;
   source_ip?: string;
   destination_ip?: string;
+  triggering_detection_ids?: string[];
   executive_summary: string;
   initial_access_vector: string;
   affected_assets: string[];
