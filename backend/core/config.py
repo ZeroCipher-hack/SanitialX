@@ -61,7 +61,7 @@ class Settings(BaseSettings):
         description="Google Gemini API key; keep server-side only",
     )
     gemini_model: str = Field(
-        default="gemini-2.5-flash",
+        default="gemini-3.6-flash",
         description="Gemini model used for incident analysis",
     )
 

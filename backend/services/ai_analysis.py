@@ -75,31 +75,77 @@ def analyze_incident(
     incident: Any,
     *,
     api_key: str,
-    model: str = "gemini-2.5-flash",
+    model: str = "gemini-3-flash-preview",
 ) -> AIIncidentAnalysis:
-    """Run one Gemini incident analysis and validate its structured output."""
+    """Run Gemini incident analysis with automatic model fallback.
+
+    The primary configured model is tried first. If Gemini returns a
+    transient server-side error such as HTTP 503, a known stable fallback
+    model is attempted before failing the analysis.
+    """
     client = genai.Client(api_key=api_key)
 
-    response = client.models.generate_content(
-        model=model,
-        contents=_build_prompt(incident),
-        config=types.GenerateContentConfig(
-            temperature=0.2,
-            response_mime_type="application/json",
-            response_schema=AIIncidentAnalysis,
-        ),
-    )
+    # Keep the configured model first, then use stable fallbacks.
+    candidate_models: list[str] = []
+    for candidate in (
+        model,
+        "gemini-3-flash-preview",
+        "gemini-2.5-flash",
+    ):
+        if candidate and candidate not in candidate_models:
+            candidate_models.append(candidate)
 
-    if getattr(response, "parsed", None) is not None:
-        parsed = response.parsed
-        if isinstance(parsed, AIIncidentAnalysis):
-            return parsed
-        return AIIncidentAnalysis.model_validate(parsed)
+    last_error: Exception | None = None
 
-    if not response.text:
-        raise RuntimeError("Gemini returned an empty analysis response")
+    for candidate_model in candidate_models:
+        try:
+            logger.info(
+                "Running Gemini incident analysis for %s with model=%s",
+                incident.incident_id,
+                candidate_model,
+            )
 
-    return AIIncidentAnalysis.model_validate_json(response.text)
+            response = client.models.generate_content(
+                model=candidate_model,
+                contents=_build_prompt(incident),
+                config=types.GenerateContentConfig(
+                    temperature=0.2,
+                    response_mime_type="application/json",
+                    response_schema=AIIncidentAnalysis,
+                ),
+            )
+
+            if getattr(response, "parsed", None) is not None:
+                parsed = response.parsed
+                if isinstance(parsed, AIIncidentAnalysis):
+                    return parsed
+                return AIIncidentAnalysis.model_validate(parsed)
+
+            if not response.text:
+                raise RuntimeError(
+                    f"Gemini returned an empty analysis response "
+                    f"using model {candidate_model}"
+                )
+
+            return AIIncidentAnalysis.model_validate_json(response.text)
+
+        except Exception as exc:
+            last_error = exc
+            logger.warning(
+                "Gemini model %s failed for incident %s: %s",
+                candidate_model,
+                incident.incident_id,
+                exc,
+                exc_info=True,
+            )
+
+            # Try the next model. This is intentionally broad because the
+            # Gemini SDK may wrap transient HTTP failures in different
+            # exception classes across versions.
+
+    raise RuntimeError(
+        f"All Gemini models failed for incident {incident.incident_id}"
+    ) from last_error
 
 
 def fallback_analysis(incident: Any) -> AIIncidentAnalysis:
