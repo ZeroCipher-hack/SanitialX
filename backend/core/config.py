@@ -12,9 +12,6 @@ from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Known placeholder values that must never be used outside local dev.
-# If either secret matches one of these (or is too short), the app refuses
-# to boot. This is intentional — it is the fix for the "forgeable JWT if
-# nobody sets the env var" vulnerability found in review.
 _INSECURE_SECRET_VALUES = {
     "sentinelx-secret-key-change-in-production",
     "change_this_placeholder_api_key_in_production",
@@ -25,12 +22,7 @@ _MIN_SECRET_LENGTH = 32
 
 
 class Settings(BaseSettings):
-    """Canonical application settings for SentinelX.
-
-    All configuration values are loaded from environment variables prefixed
-    with ``SENTINELX_``.  A ``.env`` file in the working directory is also
-    read automatically if present.
-    """
+    """Canonical application settings for SentinelX."""
 
     model_config = SettingsConfigDict(
         env_prefix="SENTINELX_",
@@ -45,32 +37,35 @@ class Settings(BaseSettings):
     log_level: str = Field(default="INFO", description="Logging level")
 
     # ── Network capture ──────────────────────────────────────────────
-    capture_interface: str = Field(
-        default="eth0",
-        description="Network interface for packet capture",
-    )
-    capture_filter: str = Field(
-        default="",
-        description="BPF filter string for packet capture",
-    )
+    capture_interface: str = Field(default="eth0")
+    capture_filter: str = Field(default="")
 
-    # ── Environment & API ─────────────────────────────────────────────
-    environment: str = Field(default="development", description="Execution environment")
-    api_host: str = Field(default="0.0.0.0", description="API listen host")
-    api_port: int = Field(default=8000, description="API listen port")
+    # ── Environment & API ───────────────────────────────────────────
+    environment: str = Field(default="development")
+    api_host: str = Field(default="0.0.0.0")
+    api_port: int = Field(default=8000)
     frontend_origin: str = Field(
-        default="http://localhost:3000,http://127.0.0.1:3000",
-        description="Allowed CORS frontend origins (comma-separated)",
+        default="http://localhost:3000,http://127.0.0.1:3000"
     )
 
-    # No defaults for secrets anymore — Settings() will raise a clear
-    # pydantic ValidationError at boot if these env vars are unset, instead
-    # of silently falling back to a value that is printed in this file.
+    # Secrets are required for authentication.
     api_key: str = Field(..., description="API Key for placeholder auth")
     jwt_secret_key: str = Field(..., description="JWT signing secret key")
-    jwt_algorithm: str = Field(default="HS256", description="JWT signing algorithm")
+    jwt_algorithm: str = Field(default="HS256")
 
-    # ── Infrastructure ────────────────────────────────────────────────
+    # ── Gemini AI ────────────────────────────────────────────────────
+    # Optional so the backend can still boot when AI is not configured.
+    # The key must NEVER be placed in frontend code or committed to git.
+    gemini_api_key: str | None = Field(
+        default=None,
+        description="Google Gemini API key; keep server-side only",
+    )
+    gemini_model: str = Field(
+        default="gemini-2.5-flash",
+        description="Gemini model used for incident analysis",
+    )
+
+    # ── Infrastructure ──────────────────────────────────────────────
     database_url: str = Field(
         default="postgresql+asyncpg://sentinelx:sentinelx@localhost:5432/sentinelx",
         description="PostgreSQL async database URL",
@@ -82,17 +77,11 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def _reject_insecure_secrets(self) -> "Settings":
-        """Refuse to boot with a known placeholder or too-short secret.
-
-        This runs for every Settings instantiation, including in tests —
-        tests must pass explicit non-placeholder values (see
-        tests/test_auth_endpoint.py for the pattern).
-        """
+        """Refuse to boot with known placeholder authentication secrets."""
         if self.jwt_secret_key in _INSECURE_SECRET_VALUES:
             raise ValueError(
                 "SENTINELX_JWT_SECRET_KEY is set to a known placeholder value. "
-                "Generate a real secret, e.g. `openssl rand -hex 32`, and set it "
-                "via the SENTINELX_JWT_SECRET_KEY environment variable."
+                "Generate a real secret, e.g. `openssl rand -hex 32`."
             )
         if len(self.jwt_secret_key) < _MIN_SECRET_LENGTH:
             raise ValueError(
@@ -106,7 +95,7 @@ class Settings(BaseSettings):
             )
         return self
 
-    # ── Property aliases ──────────────────────────────────────────────
+    # ── Property aliases ─────────────────────────────────────────────
     @property
     def ENVIRONMENT(self) -> str:
         return self.environment
