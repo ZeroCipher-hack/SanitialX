@@ -16,6 +16,14 @@ const ALLOWED_TRANSITIONS: Record<IncidentStatus, IncidentStatus[]> = {
   CLOSED: ['OPEN'],
 };
 
+function formatDate(value: string) {
+  return new Intl.DateTimeFormat('en-GB', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+    timeZone: 'UTC',
+  }).format(new Date(value));
+}
+
 function IncidentsContent() {
   const searchParams = useSearchParams();
   const targetId = searchParams.get('id');
@@ -112,6 +120,7 @@ function IncidentsContent() {
         <div className="search">
           <Search size={15} />
           <input
+            suppressHydrationWarning
             placeholder="Search incidents, IPs or titles..."
             value={q}
             onChange={(e) => setQ(e.target.value)}
@@ -187,7 +196,7 @@ function IncidentsContent() {
                         {isUpdating && <Loader2 size={13} className="animate-spin text-cyan" />}
                       </div>
                     </td>
-                    <td className="mono">{new Date(x.created_at).toLocaleString()}</td>
+                    <td className="mono">{formatDate(x.created_at)}</td>
                     <td>
                       <button
                         className="refresh"
@@ -279,12 +288,12 @@ function IncidentsContent() {
 
               <div className="modal-field">
                 <label>CREATED AT</label>
-                <b>{new Date(selectedIncident.created_at).toLocaleString()}</b>
+                <b>{formatDate(selectedIncident.created_at)}</b>
               </div>
 
               <div className="modal-field">
                 <label>UPDATED AT</label>
-                <b>{new Date(selectedIncident.updated_at).toLocaleString()}</b>
+                <b>{formatDate(selectedIncident.updated_at)}</b>
               </div>
 
               <div className="modal-field full">
