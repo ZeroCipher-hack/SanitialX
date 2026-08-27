@@ -19,7 +19,6 @@ from incidents.models import Incident
 from incidents.repository import IncidentRepository
 
 
-# Allowed status state transition map
 _ALLOWED_TRANSITIONS: dict[IncidentStatus, set[IncidentStatus]] = {
     IncidentStatus.OPEN: {
         IncidentStatus.INVESTIGATING,
@@ -41,14 +40,7 @@ _ALLOWED_TRANSITIONS: dict[IncidentStatus, set[IncidentStatus]] = {
 
 
 class IncidentService:
-    """Domain service controlling Incident creation and state transitions.
-
-    Usage::
-
-        service = IncidentService(repository)
-        incident = await service.create_incident(new_incident)
-        updated = await service.transition_status(incident_id, IncidentStatus.INVESTIGATING)
-    """
+    """Domain service controlling Incident creation, retrieval and transitions."""
 
     def __init__(self, repository: IncidentRepository) -> None:
         self._repository = repository
@@ -61,23 +53,17 @@ class IncidentService:
         """Retrieve an Incident by ID."""
         return await self._repository.get_by_id(incident_id)
 
+    async def list_incidents(self, limit: int = 100, offset: int = 0) -> list[Incident]:
+        """List incidents through the domain service boundary."""
+        return await self._repository.list_all(limit=limit, offset=offset)
+
     async def transition_status(
         self,
         incident_id: str,
         new_status: IncidentStatus,
         expected_version: int | None = None,
     ) -> Incident:
-        """Transition an incident to a new status.
-
-        Validates that the status transition is permitted, increments the
-        version counter, updates timestamp, and calls repository.update() with
-        the expected previous version.
-
-        Raises:
-            KeyError: if incident_id is not found.
-            ValidationError: if the status transition is prohibited.
-            IncidentConflictError: if a concurrent update modified the version.
-        """
+        """Transition an incident to a permitted status with OCC."""
         current = await self._repository.get_by_id(incident_id)
         if current is None:
             raise KeyError(f"Incident '{incident_id}' not found.")
@@ -92,7 +78,6 @@ class IncidentService:
                 f"'{current.status.value}' to '{new_status.value}'."
             )
 
-        # Construct updated immutable Incident with incremented version
         now = datetime.now(timezone.utc)
         ver_check = expected_version if expected_version is not None else current.version
         updated_model = Incident(
