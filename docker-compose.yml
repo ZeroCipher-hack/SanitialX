@@ -41,11 +41,10 @@ services:
       dockerfile: Dockerfile
     container_name: sentinelx-migrate
     command: alembic upgrade head
+    env_file:
+      - ./backend/.env
     environment:
       SENTINELX_DATABASE_URL: ${SENTINELX_DATABASE_URL:-postgresql+asyncpg://sentinelx:sentinelx_password_change_me@postgres:5432/sentinelx}
-      # get_settings() now requires these two on every boot path, including
-      # this one-shot migration container — without them Settings() raises
-      # and the migration never runs. Must come from the root .env file.
       SENTINELX_API_KEY: ${SENTINELX_API_KEY:?SENTINELX_API_KEY must be set in .env}
       SENTINELX_JWT_SECRET_KEY: ${SENTINELX_JWT_SECRET_KEY:?SENTINELX_JWT_SECRET_KEY must be set in .env}
     depends_on:
@@ -60,6 +59,8 @@ services:
     container_name: sentinelx-backend
     restart: unless-stopped
     command: uvicorn main:create_app --factory --host 0.0.0.0 --port 8000
+    env_file:
+      - ./backend/.env
     ports:
       - "${SENTINELX_API_PORT:-8000}:8000"
     environment:
@@ -88,10 +89,8 @@ services:
       dockerfile: Dockerfile
     container_name: sentinelx-worker
     restart: unless-stopped
-    # scripts/run_worker.py attaches the Redis event bus before starting the
-    # correlation worker — a bare ApplicationContainer has no event bus
-    # attached (event_bus=None), which left correlation_worker as None and
-    # made the previous inline command crash with AttributeError.
+    env_file:
+      - ./backend/.env
     command: python scripts/run_worker.py
     environment:
       SENTINELX_APP_NAME: ${SENTINELX_APP_NAME:-SentinelX}
