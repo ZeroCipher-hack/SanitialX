@@ -16,7 +16,7 @@ const nextConfig: NextConfig = {
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
               "font-src 'self' https://fonts.gstatic.com data:; " +
               "img-src 'self' data: blob:; " +
-              "connect-src 'self' http://localhost:8000 ws://localhost:3000; " +
+              "connect-src 'self' https://sanitialx-backend.onrender.com http://localhost:8000 ws://localhost:3000; " +
               "frame-ancestors 'none'; " +
               "base-uri 'self'; " +
               "form-action 'self'",
