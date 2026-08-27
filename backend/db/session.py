@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import logging
 from typing import AsyncGenerator
-from urllib.parse import urlsplit, urlunsplit
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
@@ -19,16 +19,34 @@ logger = logging.getLogger(__name__)
 
 
 def _normalize_database_url(database_url: str) -> str:
-    """Normalize common hosted PostgreSQL URLs for SQLAlchemy async usage.
+    """Normalize hosted PostgreSQL URLs for SQLAlchemy + asyncpg.
 
-    Render commonly exposes DATABASE_URL as ``postgresql://`` or
-    ``postgres://``. SQLAlchemy's async engine must use the asyncpg dialect;
-    otherwise it attempts to import the synchronous psycopg2 driver.
+    asyncpg does not accept SQLAlchemy/psycopg-style ``sslmode`` as a
+    connection keyword. Render/PostgreSQL URLs commonly contain
+    ``sslmode=require``; asyncpg expects the equivalent ``ssl=require``.
     """
     parts = urlsplit(database_url)
-    if parts.scheme in {"postgres", "postgresql"}:
-        return urlunsplit(("postgresql+asyncpg", parts.netloc, parts.path, parts.query, parts.fragment))
-    return database_url
+    if parts.scheme not in {"postgres", "postgresql", "postgresql+asyncpg"}:
+        return database_url
+
+    query = parse_qsl(parts.query, keep_blank_values=True)
+    normalized_query: list[tuple[str, str]] = []
+    sslmode: str | None = None
+
+    for key, value in query:
+        if key.lower() == "sslmode":
+            sslmode = value
+            continue
+        if key.lower() == "ssl":
+            # Preserve an explicit asyncpg-compatible ssl setting.
+            sslmode = None
+        normalized_query.append((key, value))
+
+    if sslmode and not any(key.lower() == "ssl" for key, _ in normalized_query):
+        normalized_query.append(("ssl", sslmode))
+
+    scheme = "postgresql+asyncpg" if parts.scheme in {"postgres", "postgresql"} else parts.scheme
+    return urlunsplit((scheme, parts.netloc, parts.path, urlencode(normalized_query), parts.fragment))
 
 
 class DatabaseSessionManager:
