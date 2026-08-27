@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Shield, Activity, AlertTriangle, FileText, Sliders, LogOut, Bell, X, Play, Cpu, Layers, Zap, Radio, Share2, Crosshair, Box, Brain, CheckCircle2, Loader2, BookOpen, ScrollText } from 'lucide-react';
+import { Shield, Activity, AlertTriangle, FileText, Sliders, LogOut, Bell, X, Play, Cpu, Layers, Zap, Radio, Share2, Crosshair, Box, Brain, CheckCircle2, Loader2, BookOpen, ScrollText, Terminal, Bot, Server, ChevronRight, CircleDot } from 'lucide-react';
 import { useEffect, useState, useRef } from 'react';
 import { api, logout, runAttackSimulation } from '@/lib/api';
 import type { Incident } from '@/types/api';
@@ -135,7 +135,55 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </div>
           </div>
         </header>
-        <section className="content">{children}</section>
+
+        <div className="workspace-layout">
+          <section className="content">{children}</section>
+
+          <aside className="secondary-rail" aria-label="Tezkor ma'lumot paneli">
+            <div className="rail-header">
+              <div><span className="rail-kicker">TEZKOR NAZORAT</span><strong>Operatsion holat</strong></div>
+              <CircleDot size={15} className="rail-live" />
+            </div>
+
+            <div className="rail-status-card">
+              <div className="rail-card-title"><Server size={14} /> Xizmatlar</div>
+              <div className="rail-status-row"><span>Frontend</span><b className="is-ok">FAOL</b></div>
+              <div className="rail-status-row"><span>API ulanishi</span><b className="is-ok">TEKSHIRILDI</b></div>
+              <div className="rail-status-row"><span>Faol hodisalar</span><b>{activeIncidentsCount}</b></div>
+            </div>
+
+            <div className="rail-section">
+              <div className="rail-section-title"><Terminal size={14} /> Tezkor amallar</div>
+              <Link href="/logs" className="rail-link"><span>Loglarni ko‘rish</span><ChevronRight size={13} /></Link>
+              <Link href="/events" className="rail-link"><span>Hodisalarni ko‘rish</span><ChevronRight size={13} /></Link>
+              <Link href="/simulations" className="rail-link"><span>Simulyatsiyalar</span><ChevronRight size={13} /></Link>
+              <Link href="/guide" className="rail-link"><span>Tizimni o‘rganish</span><ChevronRight size={13} /></Link>
+            </div>
+
+            <div className="rail-section">
+              <div className="rail-section-title"><Bot size={14} /> AI tahlil</div>
+              <div className="ai-status-box">
+                <span className="ai-status-dot" />
+                <div><b>Tayyorlanmoqda</b><small>AI API kaliti ulanmagan</small></div>
+              </div>
+              <Link href="/ai-analysis" className="rail-ai-link">AI modulini ochish <ChevronRight size={13} /></Link>
+            </div>
+
+            <div className="rail-section">
+              <div className="rail-section-title"><ScrollText size={14} /> Log oqimi</div>
+              <div className="rail-log-preview">
+                <div><span>STATUS</span><b>Monitoring faol</b></div>
+                <div><span>INCIDENTS</span><b>{incidents.length} muhim hodisa</b></div>
+                <div><span>REFRESH</span><b>15 soniyada</b></div>
+              </div>
+            </div>
+
+            <div className="rail-footer-note">
+              <BookOpen size={14} />
+              <span>Har bir modul nima qilishini <Link href="/guide">Qo‘llanma</Link> bo‘limidan o‘rganing.</span>
+            </div>
+          </aside>
+        </div>
       </div>
     </div>
   );
