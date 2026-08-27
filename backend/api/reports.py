@@ -34,6 +34,10 @@ def _report_fields(inc, analysis: AIIncidentAnalysis) -> dict:
         "destination_ip": inc.destination_ip,
         "triggering_detection_ids": inc.triggering_detection_ids,
         "executive_summary": analysis.executive_summary,
+        "threat_classification": analysis.threat_classification,
+        "confidence_score": analysis.confidence_score,
+        "key_findings": analysis.key_findings,
+        "indicators_of_compromise": analysis.indicators_of_compromise,
         "initial_access_vector": analysis.initial_access_vector,
         "affected_assets": analysis.affected_assets,
         "observed_techniques": analysis.observed_techniques,
@@ -62,8 +66,6 @@ async def _analyze(inc) -> AIIncidentAnalysis:
             model=settings.gemini_model,
         )
     except Exception:
-        # AI must enrich the SOC workflow, not take the API down when a model,
-        # quota, network connection, or malformed response fails.
         logger.exception("Gemini incident analysis failed for %s", inc.incident_id)
         return fallback_analysis(inc)
 
@@ -75,7 +77,7 @@ async def list_reports(
     limit: int = Query(default=50, ge=1, le=500),
     offset: int = Query(default=0, ge=0),
 ):
-    """List investigation reports derived from correlated security incidents."""
+    """List lightweight investigation report records."""
     incidents = await repo.list_all(limit=limit, offset=offset)
     reports = []
     for inc in incidents:
@@ -90,12 +92,10 @@ async def list_reports(
                 "created_at": inc.created_at.isoformat(),
                 "updated_at": inc.updated_at.isoformat(),
                 "executive_summary": context.get(
-                    "executive_summary", "Open the incident for Gemini AI analysis."
+                    "executive_summary", "Open the incident to run Gemini AI analysis."
                 ),
                 "overall_risk_score": context.get("overall_risk_score", 0),
-                "observed_techniques_count": len(
-                    context.get("observed_techniques", [])
-                ),
+                "observed_techniques_count": len(context.get("observed_techniques", [])),
                 "affected_assets": context.get("affected_assets", []),
             }
         )
