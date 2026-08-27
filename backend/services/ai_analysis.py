@@ -21,6 +21,10 @@ class AIIncidentAnalysis(BaseModel):
     """Structured fields consumed by the investigation report UI."""
 
     executive_summary: str
+    threat_classification: str = "Unknown"
+    confidence_score: int = Field(default=0, ge=0, le=100)
+    key_findings: list[str] = Field(default_factory=list)
+    indicators_of_compromise: list[str] = Field(default_factory=list)
     initial_access_vector: str
     affected_assets: list[str] = Field(default_factory=list)
     observed_techniques: list[str] = Field(default_factory=list)
@@ -40,14 +44,24 @@ provided telemetry. Do not invent IP addresses, users, commands, assets, or
 attack evidence that is not supported by the input. When evidence is missing,
 state that it is unknown or inferred.
 
-Return a concise but useful defensive investigation. Identify likely MITRE
-ATT&CK technique IDs only when supported by the observed behavior. Risk must
-be an integer from 0 to 100 based on severity, evidence, impact, persistence,
-and confidence.
+Return a concise defensive investigation with:
+- threat classification
+- confidence score from 0 to 100
+- key evidence-backed findings
+- indicators of compromise actually present in telemetry
+- likely MITRE ATT&CK technique IDs only when supported
+- initial access vector
+- affected assets
+- honeypot engagement and simulated impact
+- risk score from 0 to 100
+- prioritized remediation actions
+
+Do not treat simulated impact as confirmed real-world data loss.
 
 INCIDENT:
 incident_id: {incident.incident_id}
 title: {incident.title}
+description: {incident.description}
 severity: {incident.severity.value}
 status: {incident.status.value}
 source_ip: {incident.source_ip or 'unknown'}
@@ -96,6 +110,10 @@ def fallback_analysis(incident: Any) -> AIIncidentAnalysis:
             "executive_summary",
             f"AI analysis is unavailable. Incident requires manual investigation: {incident.title}.",
         ),
+        threat_classification=context.get("threat_classification", "Unknown"),
+        confidence_score=int(context.get("confidence_score", 0)),
+        key_findings=context.get("key_findings", []),
+        indicators_of_compromise=context.get("indicators_of_compromise", []),
         initial_access_vector=context.get(
             "initial_access_vector", "Insufficient telemetry for confident attribution."
         ),
