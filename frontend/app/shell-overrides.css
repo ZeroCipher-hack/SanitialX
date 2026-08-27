@@ -1,0 +1,24 @@
+/* SanitialX UX foundation overrides */
+html,body{overflow-x:hidden}
+.app-grid{min-height:100vh}
+.sidebar{height:100vh;max-height:100vh;overflow:hidden;padding:18px 12px 12px}
+.sidebar .nav{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;padding-right:4px;scrollbar-width:thin;scrollbar-color:#24404d transparent}
+.sidebar .nav::-webkit-scrollbar{width:5px}.sidebar .nav::-webkit-scrollbar-track{background:transparent}.sidebar .nav::-webkit-scrollbar-thumb{background:#24404d;border-radius:8px}
+.sidebar .nav-item{font-size:13px;min-height:40px;padding:9px 11px;white-space:nowrap}
+.sidebar .nav-group-title{font-size:10px;padding-top:14px;color:#526a76}
+.sidebar-footer{flex:0 0 auto;padding-top:10px;border-top:1px solid var(--border);margin-top:8px;background:#070b11}
+.logout-btn{display:flex;align-items:center;gap:8px;width:100%;justify-content:center;font-size:10px;padding:8px}
+.main-wrapper{min-width:0;min-height:100vh}
+.content{min-width:0}
+.topbar{min-width:0}
+@media(max-width:1050px){.sidebar{width:76px}.sidebar .nav{padding-right:0}.sidebar .nav-item{justify-content:center;padding:10px}.sidebar .nav-group-title{font-size:0;padding:10px 0}.sidebar .nav-group-title::after{content:'•';font-size:12px;color:#405360}.sidebar-footer .logout-btn{padding:10px 0}.main-wrapper{margin-left:76px}}
+@media(max-width:700px){.sidebar{display:none}.main-wrapper{margin-left:0}.topbar{padding:0 15px}}
+/* Secondary utility rail space */
+.secondary-rail{width:280px;flex:0 0 280px;border-left:1px solid var(--border);background:#070d14;overflow-y:auto}
+@media(max-width:1200px){.secondary-rail{width:240px;flex-basis:240px}}
+@media(max-width:900px){.secondary-rail{display:none}}
+/* Larger, easier-to-read application text */
+.page h1{font-size:30px}.page p{font-size:12px}.panel-head h2{font-size:13px}.event-main b{font-size:11px}.nav-item{letter-spacing:.05px}
+.guide-card{background:linear-gradient(145deg,#0c151e,#080e15);border:1px solid var(--border);border-radius:12px;padding:18px}.guide-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.guide-card h3{margin:0 0 8px;font-size:14px}.guide-card p,.guide-card li{font-size:11px;line-height:1.7;color:#9eb0b9}.guide-card code{font-family:'DM Mono';font-size:10px;color:var(--cyan2)}
+.log-toolbar{display:flex;gap:8px;flex-wrap:wrap}.log-line{display:grid;grid-template-columns:150px 80px 1fr;gap:12px;padding:10px 12px;border-top:1px solid #14232d;font:10px 'DM Mono';color:#8ea2ac}.log-line:first-child{border-top:0}.log-time{color:#526a76}.log-level{color:var(--cyan)}.log-message{color:#c0cdd3;white-space:pre-wrap;word-break:break-word}
+@media(max-width:700px){.guide-grid{grid-template-columns:1fr}.log-line{grid-template-columns:1fr;gap:4px}}
