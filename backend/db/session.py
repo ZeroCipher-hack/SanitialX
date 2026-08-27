@@ -21,32 +21,36 @@ logger = logging.getLogger(__name__)
 def _normalize_database_url(database_url: str) -> str:
     """Normalize hosted PostgreSQL URLs for SQLAlchemy + asyncpg.
 
-    asyncpg does not accept SQLAlchemy/psycopg-style ``sslmode`` as a
-    connection keyword. Render/PostgreSQL URLs commonly contain
-    ``sslmode=require``; asyncpg expects the equivalent ``ssl=require``.
+    Render external PostgreSQL URLs commonly use ``sslmode=require``.
+    asyncpg expects the equivalent ``ssl=require`` query option, and passing
+    ``sslmode`` through to asyncpg causes ``connect() got an unexpected
+    keyword argument 'sslmode'``.
     """
     parts = urlsplit(database_url)
     if parts.scheme not in {"postgres", "postgresql", "postgresql+asyncpg"}:
         return database_url
 
-    query = parse_qsl(parts.query, keep_blank_values=True)
-    normalized_query: list[tuple[str, str]] = []
-    sslmode: str | None = None
+    pairs = parse_qsl(parts.query, keep_blank_values=True)
+    normalized: list[tuple[str, str]] = []
+    ssl_value: str | None = None
+    has_ssl = False
 
-    for key, value in query:
-        if key.lower() == "sslmode":
-            sslmode = value
+    for key, value in pairs:
+        key_lower = key.lower()
+        if key_lower == "sslmode":
+            ssl_value = value
             continue
-        if key.lower() == "ssl":
-            # Preserve an explicit asyncpg-compatible ssl setting.
-            sslmode = None
-        normalized_query.append((key, value))
+        if key_lower == "ssl":
+            has_ssl = True
+        normalized.append((key, value))
 
-    if sslmode and not any(key.lower() == "ssl" for key, _ in normalized_query):
-        normalized_query.append(("ssl", sslmode))
+    if ssl_value is not None and not has_ssl:
+        normalized.append(("ssl", ssl_value))
 
-    scheme = "postgresql+asyncpg" if parts.scheme in {"postgres", "postgresql"} else parts.scheme
-    return urlunsplit((scheme, parts.netloc, parts.path, urlencode(normalized_query), parts.fragment))
+    scheme = "postgresql+asyncpg"
+    return urlunsplit(
+        (scheme, parts.netloc, parts.path, urlencode(normalized), parts.fragment)
+    )
 
 
 class DatabaseSessionManager:
