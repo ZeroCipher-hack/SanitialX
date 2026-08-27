@@ -118,6 +118,10 @@ export interface InvestigationReport {
   destination_ip?: string;
   triggering_detection_ids?: string[];
   executive_summary: string;
+  threat_classification: string;
+  confidence_score: number;
+  key_findings: string[];
+  indicators_of_compromise: string[];
   initial_access_vector: string;
   affected_assets: string[];
   observed_techniques: string[];
