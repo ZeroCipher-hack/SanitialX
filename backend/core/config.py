@@ -8,6 +8,8 @@ instantiate Settings() explicitly or receive it via dependency injection.
 
 from __future__ import annotations
 
+import os
+
 from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -31,16 +33,13 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    # ── Application ──────────────────────────────────────────────────
     app_name: str = Field(default="SentinelX", description="Application name")
     debug: bool = Field(default=False, description="Enable debug mode")
     log_level: str = Field(default="INFO", description="Logging level")
 
-    # ── Network capture ──────────────────────────────────────────────
     capture_interface: str = Field(default="eth0")
     capture_filter: str = Field(default="")
 
-    # ── Environment & API ───────────────────────────────────────────
     environment: str = Field(default="development")
     api_host: str = Field(default="0.0.0.0")
     api_port: int = Field(default=8000)
@@ -48,14 +47,10 @@ class Settings(BaseSettings):
         default="http://localhost:3000,http://127.0.0.1:3000"
     )
 
-    # Secrets are required for authentication.
     api_key: str = Field(..., description="API Key for placeholder auth")
     jwt_secret_key: str = Field(..., description="JWT signing secret key")
     jwt_algorithm: str = Field(default="HS256")
 
-    # ── Gemini AI ────────────────────────────────────────────────────
-    # Optional so the backend can still boot when AI is not configured.
-    # The key must NEVER be placed in frontend code or committed to git.
     gemini_api_key: str | None = Field(
         default=None,
         description="Google Gemini API key; keep server-side only",
@@ -65,7 +60,6 @@ class Settings(BaseSettings):
         description="Gemini model used for incident analysis",
     )
 
-    # ── Infrastructure ──────────────────────────────────────────────
     database_url: str = Field(
         default="postgresql+asyncpg://sentinelx:sentinelx@localhost:5432/sentinelx",
         description="PostgreSQL async database URL",
@@ -76,8 +70,20 @@ class Settings(BaseSettings):
     )
 
     @model_validator(mode="after")
-    def _reject_insecure_secrets(self) -> "Settings":
-        """Refuse to boot with known placeholder authentication secrets."""
+    def _normalize_and_validate(self) -> "Settings":
+        # Backwards-compatible support for Render services that still expose
+        # the unprefixed names. Only use these when the prefixed values are
+        # missing/blank; normal SENTINELX_* variables always win.
+        if not self.database_url.strip():
+            legacy_database_url = os.getenv("DATABASE_URL", "").strip()
+            if legacy_database_url:
+                self.database_url = legacy_database_url
+
+        if not self.redis_url.strip():
+            legacy_redis_url = os.getenv("REDIS_URL", "").strip()
+            if legacy_redis_url:
+                self.redis_url = legacy_redis_url
+
         if self.jwt_secret_key in _INSECURE_SECRET_VALUES:
             raise ValueError(
                 "SENTINELX_JWT_SECRET_KEY is set to a known placeholder value. "
@@ -95,7 +101,6 @@ class Settings(BaseSettings):
             )
         return self
 
-    # ── Property aliases ─────────────────────────────────────────────
     @property
     def ENVIRONMENT(self) -> str:
         return self.environment
