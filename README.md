@@ -1,77 +1,191 @@
-# SentinelX — Modular Production-Grade Async SIEM Backend
+# SentinelX — Modular Async SIEM Backend
 
-SentinelX is a modular, high-performance, async-first SIEM (Security Information and Event Management) backend system built with Python, FastAPI, Scapy, Redis Streams, PostgreSQL, and SQLAlchemy 2.x.
+[![Python](https://img.shields.io/badge/Python-3.x-blue?logo=python)](https://www.python.org/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-async-green?logo=fastapi)](https://fastapi.tiangolo.com/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-blue?logo=postgresql)](https://www.postgresql.org/)
+[![Redis](https://img.shields.io/badge/Redis-Streams-red?logo=redis)](https://redis.io/)
+[![Docker](https://img.shields.io/badge/Docker-Compose-blue?logo=docker)](https://www.docker.com/)
 
----
+**SentinelX** is a security-focused, async-first SIEM backend for ingesting network events, normalizing telemetry, correlating detections, and managing security incidents through a secured REST API.
 
-## Architecture Overview
+> **Status:** Active development
 
-1. **Sensors Layer:** Network sniffer (`ScapySensor`) capturing live network events into `RawEvent` objects using a thread-to-async event loop bridge.
-2. **Normalizers Layer:** `Dispatcher` and `ScapyNormalizer` transforming raw network payloads into immutable `NormalizedEvent` canonical events.
-3. **Pipeline & Bus Layer:** `Pipeline` dispatching normalized events to `RedisEventBus` backed by Redis Streams (`sentinelx.events`).
-4. **Correlation Engine & Worker:** `CorrelationWorker` running background event stream processing, evaluating detection rules (`PortScan`, `SSHBruteforce`, `Honeypot`), and building `Incident` domain entities.
-5. **Domain & Persistence Layer:** `IncidentService` with optimistic concurrency control (`version` check) persisting incidents to PostgreSQL via `PostgresIncidentRepository` and `PostgresDetectionRuleRepository`.
-6. **API & Security Layer:** FastAPI application (`main.py`) exposing `/api/v1/*` endpoints protected by JWT Bearer token authentication and role-based access control (`reader`, `analyst`, `admin`).
+## Why SentinelX?
 
----
+The project demonstrates a production-oriented security event pipeline rather than a simple packet sniffer:
 
-## Quickstart: Docker Compose Deployment
+- Network telemetry collection with Scapy
+- Canonical event normalization
+- Redis Streams event transport
+- Background correlation and detection workers
+- Incident persistence in PostgreSQL
+- JWT authentication and role-based access control
+- Dockerized development and test infrastructure
+- Automated database migrations with Alembic
 
-### 1. Environment Configuration
-Copy the example environment file and adjust secrets for production:
+## Architecture
+
+```text
+Network Traffic
+      │
+      ▼
+ Scapy Sensor
+      │
+      ▼
+ Event Normalizer
+      │
+      ▼
+ Redis Streams
+      │
+      ▼
+ Correlation Worker
+      │
+      ├── Port Scan Detection
+      ├── SSH Brute-force Detection
+      └── Honeypot Detection
+      │
+      ▼
+ Incident Service
+      │
+      ▼
+ PostgreSQL
+      │
+      ▼
+ FastAPI REST API
+      │
+      ▼
+ JWT + RBAC
+```
+
+## Core Components
+
+| Layer | Responsibility |
+|---|---|
+| Sensors | Capture network events with Scapy |
+| Normalizers | Convert raw telemetry into canonical events |
+| Event Bus | Transport events through Redis Streams |
+| Correlation Engine | Evaluate detection rules and create incidents |
+| Persistence | Store incidents and detection rules in PostgreSQL |
+| API | Expose `/api/v1/*` endpoints through FastAPI |
+| Security | JWT Bearer authentication and `reader` / `analyst` / `admin` RBAC |
+
+## Detection Rules
+
+Current detection examples include:
+
+- Port scanning
+- SSH brute-force activity
+- Honeypot events
+
+The architecture is designed so additional detection rules can be added without rewriting the ingestion pipeline.
+
+## Tech Stack
+
+**Backend:** Python, FastAPI, SQLAlchemy 2.x, Alembic  
+**Security/Network:** Scapy, JWT, RBAC  
+**Data:** PostgreSQL 16, Redis 7 / Redis Streams  
+**Infrastructure:** Docker Compose  
+**Testing:** pytest, integration/E2E test infrastructure
+
+## Quick Start
+
+### 1. Configure environment
+
 ```bash
 cp backend/.env.example .env
 ```
 
-### 2. Start the SentinelX Full Stack
-Run the complete multi-container stack:
+Review the environment values and replace development secrets before using the stack outside local development.
+
+### 2. Start the stack
+
 ```bash
 docker compose up -d --build
 ```
 
-This starts:
-- **`postgres`**: PostgreSQL 16 database container with volume persistence (`postgres_data`).
-- **`redis`**: Redis 7 container configured with AOF persistence (`redis_data`).
-- **`migrate`**: One-shot container running `alembic upgrade head` to apply database migrations before backend and worker boot up.
-- **`backend`**: FastAPI web application running on port `8000`.
-- **`worker`**: `CorrelationWorker` background stream consumer.
+The Compose stack includes:
 
----
+- `postgres` — PostgreSQL 16 with persistent storage
+- `redis` — Redis 7 with AOF persistence
+- `migrate` — Alembic migration job
+- `backend` — FastAPI API on port `8000`
+- `worker` — background correlation worker
 
-## Health Checks & API Usage
+### 3. Check service health
 
-### 1. Health Endpoints
-- **Liveness Probe (Unauthenticated):**
-  ```bash
-  curl http://localhost:8000/api/v1/health
-  ```
-  Returns `{"status": "ok", "is_ready": true, "details": {"service": "SentinelX Backend"}}`.
+```bash
+curl http://localhost:8000/api/v1/health
+```
 
-- **Readiness Probe (Requires JWT Bearer Auth):**
-  ```bash
-  curl -H "Authorization: Bearer <JWT_TOKEN>" http://localhost:8000/api/v1/health/ready
-  ```
+Authenticated readiness check:
 
-### 2. Obtaining a JWT Authentication Token
+```bash
+curl -H "Authorization: Bearer <JWT_TOKEN>" \
+  http://localhost:8000/api/v1/health/ready
+```
+
+## Authentication
+
+Obtain a JWT token through the authentication endpoint:
+
 ```bash
 curl -X POST http://localhost:8000/api/v1/auth/token \
   -H "Content-Type: application/json" \
-  -d '{"username": "analyst_jane", "password": "secret_password", "requested_role": "analyst"}'
+  -d '{"username":"analyst_jane","password":"secret_password","requested_role":"analyst"}'
 ```
 
----
+Use the returned token as a Bearer token for protected endpoints.
 
-## Running Integration & E2E Tests Locally
+## Testing
 
-Ensure your virtual environment is active:
+Run the backend test suite locally:
+
 ```bash
 cd backend
 source .venv/bin/activate
 PYTHONPATH=. python -m pytest tests/ -v
 ```
 
-### Isolated Test Infrastructure (Phase 16)
-If you want to run integration tests against separate containerized Redis & Postgres instances on non-standard ports (Postgres on 5433, Redis on 6380):
+For isolated integration infrastructure:
+
 ```bash
 docker compose -f docker-compose.test.yml up -d
 ```
+
+## Security
+
+Security-sensitive reports should be submitted privately. See [`SECURITY.md`](SECURITY.md) for the reporting policy.
+
+**Never commit:**
+
+- `.env` files containing real secrets
+- API keys or tokens
+- production credentials
+- private certificates
+- real customer or production data
+
+## Roadmap
+
+- [ ] Expand detection rule library
+- [ ] Improve event enrichment and correlation
+- [ ] Add richer incident investigation workflows
+- [ ] Expand observability and metrics
+- [ ] Harden production deployment configuration
+- [ ] Increase automated security and integration coverage
+
+## Project Structure
+
+```text
+SanitialX/
+├── backend/
+│   ├── app/
+│   ├── tests/
+│   └── migrations/
+├── docker-compose.yml
+├── docker-compose.test.yml
+└── README.md
+```
+
+## License
+
+See the repository license for usage terms.
