@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.container import ApplicationContainer
 from core.security import TokenPayload, decode_access_token
+from correlation.rule_runtime import DetectionRuleRuntimeManager
 from db.repositories.rule_repository import PostgresDetectionRuleRepository
 from db.repositories.user_repository import PostgresUserRepository
 from db.repositories.incident_repository import PostgresIncidentRepository
@@ -58,6 +59,12 @@ def get_rule_repository(
     container: Annotated[ApplicationContainer, Depends(get_container)],
 ) -> PostgresDetectionRuleRepository:
     return container.rule_repository
+
+
+def get_rule_runtime_manager(
+    container: Annotated[ApplicationContainer, Depends(get_container)],
+) -> DetectionRuleRuntimeManager:
+    return container.rule_runtime_manager
 
 
 def get_user_repository(

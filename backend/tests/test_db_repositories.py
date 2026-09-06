@@ -10,7 +10,10 @@ from core.errors import IncidentConflictError
 from correlation.enums import Severity
 from db.base import Base
 from db.repositories.incident_repository import PostgresIncidentRepository
-from db.repositories.rule_repository import PostgresDetectionRuleRepository
+from db.repositories.rule_repository import (
+    DetectionRuleVersionConflict,
+    PostgresDetectionRuleRepository,
+)
 from incidents.enums import IncidentStatus
 from incidents.models import Incident
 
@@ -64,7 +67,6 @@ class TestPostgresIncidentRepository:
         repo = PostgresIncidentRepository(async_session_factory)
         inc = await repo.create(_make_incident("inc-2", version=1))
 
-        # Update with expected_version=1 -> version bumped to 2
         updated_input = Incident(
             incident_id=inc.incident_id,
             title="Updated Title",
@@ -88,7 +90,6 @@ class TestPostgresIncidentRepository:
         repo = PostgresIncidentRepository(async_session_factory)
         inc = await repo.create(_make_incident("inc-3", version=1))
 
-        # First update succeeds, DB version becomes 2
         u1 = Incident(
             incident_id=inc.incident_id,
             title=inc.title,
@@ -101,7 +102,6 @@ class TestPostgresIncidentRepository:
         )
         await repo.update(u1, expected_version=1)
 
-        # Stale update attempting with expected_version=1 must raise IncidentConflictError
         u_stale = Incident(
             incident_id=inc.incident_id,
             title="Stale Update",
@@ -134,18 +134,53 @@ class TestPostgresDetectionRuleRepository:
     async def test_save_and_get_rule(self, async_session_factory) -> None:
         repo = PostgresDetectionRuleRepository(async_session_factory)
 
-        await repo.save_rule(
+        version = await repo.save_rule(
             rule_id="R-1",
             rule_name="Rule 1",
             severity="HIGH",
             description="Desc 1",
             parameters={"threshold": 5},
         )
+        assert version == 1
 
         rule = await repo.get_rule("R-1")
         assert rule is not None
         assert rule["rule_name"] == "Rule 1"
         assert rule["parameters"]["threshold"] == 5
+        assert rule["version"] == 1
 
         rules_list = await repo.list_rules()
         assert len(rules_list) == 1
+
+    @pytest.mark.asyncio
+    async def test_rule_version_increments_and_rejects_stale_update(self, async_session_factory) -> None:
+        repo = PostgresDetectionRuleRepository(async_session_factory)
+        await repo.save_rule(
+            rule_id="R-VERSION",
+            rule_name="Versioned Rule",
+            severity="HIGH",
+            parameters={},
+        )
+
+        version = await repo.save_rule(
+            rule_id="R-VERSION",
+            rule_name="Versioned Rule v2",
+            severity="CRITICAL",
+            parameters={},
+            expected_version=1,
+        )
+        assert version == 2
+
+        rule = await repo.get_rule("R-VERSION")
+        assert rule is not None
+        assert rule["version"] == 2
+        assert rule["severity"] == "CRITICAL"
+
+        with pytest.raises(DetectionRuleVersionConflict, match="version 2"):
+            await repo.save_rule(
+                rule_id="R-VERSION",
+                rule_name="Stale overwrite",
+                severity="LOW",
+                parameters={},
+                expected_version=1,
+            )

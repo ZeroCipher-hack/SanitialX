@@ -1,17 +1,4 @@
-"""
-CorrelationWorker — background worker consuming events and driving detection & incident creation.
-
-Requirements:
-- Consumes NormalizedEvents from EventSubscriber.
-- Passes events to CorrelationEngine.
-- On Detection, uses build_incident_from_detection and IncidentService to create incidents.
-- Persists live normalized events through an optional idempotent hook.
-- ACKs processed messages via EventSubscriber.ack.
-- Lifecycle: start(), stop(), cancellation handling.
-- Per-event error isolation (one bad event does not kill worker loop).
-- Health status distinguishing running vs successfully_processing.
-- Separate counters for processed events and failures.
-"""
+"""CorrelationWorker — background worker consuming events and driving detection & incident creation."""
 
 from __future__ import annotations
 
@@ -48,12 +35,9 @@ class CorrelationWorker:
         self._consumer_name = consumer_name
         self._event_persist_hook = event_persist_hook
         self._post_event_hook = post_event_hook
-
         self._task: asyncio.Task[None] | None = None
         self._running = False
         self._lock = threading.Lock()
-
-        # Metrics
         self._events_processed = 0
         self._events_persisted = 0
         self._event_persistence_failures = 0
@@ -68,9 +52,8 @@ class CorrelationWorker:
         return self._running
 
     def get_health(self) -> dict[str, Any]:
-        """Return health status and processing metrics."""
         with self._lock:
-            return {
+            health = {
                 "running": self._running,
                 "successfully_processing": self._running and self._failures_count == 0,
                 "events_processed": self._events_processed,
@@ -82,9 +65,10 @@ class CorrelationWorker:
                 "failures_count": self._failures_count,
                 "last_error": self._last_error,
             }
+        health["detection_engine"] = self._engine.get_metrics()
+        return health
 
     async def start(self) -> None:
-        """Start the background worker consumption loop."""
         if self._running:
             return
         self._running = True
@@ -92,7 +76,6 @@ class CorrelationWorker:
         logger.info("CorrelationWorker started.")
 
     async def stop(self) -> None:
-        """Stop the background worker gracefully."""
         if not self._running:
             return
         self._running = False
@@ -105,6 +88,11 @@ class CorrelationWorker:
             self._task = None
         logger.info("CorrelationWorker stopped.")
 
+    async def _process_event(self, event: Any):
+        if self._engine.requires_thread_offload:
+            return await asyncio.to_thread(self._engine.process_event, event)
+        return self._engine.process_event(event)
+
     async def _run_loop(self) -> None:
         try:
             async for msg_id, event in self._subscriber.consume(
@@ -113,24 +101,19 @@ class CorrelationWorker:
             ):
                 if not self._running:
                     break
-
                 try:
-                    # 1. Process event through correlation engine
-                    detections = self._engine.process_event(event)
+                    detections = await self._process_event(event)
 
                     with self._lock:
                         self._events_processed += 1
                         self._detections_count += len(detections)
 
-                    # 2. For each detection, build and create incident
                     for detection in detections:
                         incident = build_incident_from_detection(detection)
                         await self._incident_service.create_incident(incident)
                         with self._lock:
                             self._incidents_created += 1
 
-                    # 3. Persist live event. Persistence failures are isolated so
-                    # the event-bus consumer and detection pipeline keep moving.
                     if self._event_persist_hook is not None:
                         try:
                             created = await self._event_persist_hook(event)
@@ -140,15 +123,11 @@ class CorrelationWorker:
                         except Exception as persist_exc:
                             logger.error(
                                 "Event persistence hook failed for msg %s: %s: %s",
-                                msg_id,
-                                type(persist_exc).__name__,
-                                persist_exc,
+                                msg_id, type(persist_exc).__name__, persist_exc,
                             )
                             with self._lock:
                                 self._event_persistence_failures += 1
 
-                    # 4. Run optional live vulnerability correlation hook.
-                    # Hook failures are isolated from the core detection path.
                     if self._post_event_hook is not None:
                         try:
                             created = await self._post_event_hook(event)
@@ -159,25 +138,17 @@ class CorrelationWorker:
                         except Exception as hook_exc:
                             logger.error(
                                 "Post-event hook failed for msg %s: %s: %s",
-                                msg_id,
-                                type(hook_exc).__name__,
-                                hook_exc,
+                                msg_id, type(hook_exc).__name__, hook_exc,
                             )
 
-                    # 5. ACK message
                     await self._subscriber.ack(self._consumer_group, msg_id)
 
                 except Exception as exc:
                     error_msg = f"{type(exc).__name__}: {exc}"
-                    logger.error(
-                        "CorrelationWorker error processing msg %s: %s",
-                        msg_id,
-                        error_msg,
-                    )
+                    logger.error("CorrelationWorker error processing msg %s: %s", msg_id, error_msg)
                     with self._lock:
                         self._failures_count += 1
                         self._last_error = error_msg
-                    # Failure isolated — worker loop continues
 
         except asyncio.CancelledError:
             logger.info("CorrelationWorker task cancelled.")

@@ -105,7 +105,6 @@ class TestIncidentsAPI:
     async def test_patch_incident_status_success_analyst_role(self, client: TestClient) -> None:
         container: ApplicationContainer = app.state.container
 
-        # Seed an incident into repo
         from correlation.enums import Severity
         from incidents.enums import IncidentStatus
         from incidents.models import Incident
@@ -122,7 +121,6 @@ class TestIncidentsAPI:
         )
         await container.incident_repository.create(inc)
 
-        # Authorized status transition: OPEN -> INVESTIGATING with analyst role
         headers = _get_auth_headers("analyst")
         res1 = await client.patch(
             "/api/v1/incidents/inc-api-1/status",
@@ -145,7 +143,21 @@ class TestRulesAPI:
             "severity": "CRITICAL",
             "description": "Scans N ports",
             "enabled": True,
-            "parameters": {"threshold": 10},
+            "parameters": {
+                "schema_version": 1,
+                "rule_type": "distinct_threshold",
+                "conditions": [],
+                "group_by": "source_ip",
+                "threshold": 10,
+                "window_seconds": 60,
+                "cooldown_seconds": 180,
+                "distinct_by": "destination_port",
+                "mitre": {
+                    "tactic": "Discovery",
+                    "technique_id": "T1046",
+                    "technique": "Network Service Discovery",
+                },
+            },
         }
 
         put_res = await client.put("/api/v1/rules/R-TEST-1", json=payload, headers=headers)
@@ -153,7 +165,25 @@ class TestRulesAPI:
         data = put_res.json()
         assert data["rule_id"] == "R-TEST-1"
         assert data["severity"] == "CRITICAL"
+        assert data["version"] == 1
+        assert data["parameters"]["schema_version"] == 1
 
         get_res = await client.get("/api/v1/rules/R-TEST-1", headers=headers)
         assert get_res.status_code == 200
         assert get_res.json()["rule_name"] == "Custom PortScan"
+
+        update_res = await client.put(
+            "/api/v1/rules/R-TEST-1",
+            json={"enabled": False, "expected_version": 1},
+            headers=headers,
+        )
+        assert update_res.status_code == 200
+        assert update_res.json()["version"] == 2
+        assert update_res.json()["enabled"] is False
+
+        stale_res = await client.put(
+            "/api/v1/rules/R-TEST-1",
+            json={"enabled": True, "expected_version": 1},
+            headers=headers,
+        )
+        assert stale_res.status_code == 409
