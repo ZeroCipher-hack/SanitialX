@@ -113,21 +113,35 @@ async def evaluate_agent_exposure(
     agent_id: str,
     session: Annotated[AsyncSession, Depends(get_db_session)],
     _user: Annotated[TokenPayload, Depends(get_current_user)],
-    internet_exposed: bool = Query(default=False),
+    internet_exposed: bool | None = Query(
+        default=None,
+        description="Optional one-off override; otherwise the managed asset value is used.",
+    ),
 ) -> dict[str, Any]:
     agent = await PostgresAgentRepository(session).get_agent(agent_id)
     if agent is None:
         raise HTTPException(status_code=404, detail=f"Agent '{agent_id}' not found.")
 
+    effective_internet_exposed = (
+        bool(agent.get("internet_exposed")) if internet_exposed is None else internet_exposed
+    )
+    criticality = str(agent.get("criticality") or "MEDIUM").upper()
+
     service = VulnerabilityService(PostgresVulnerabilityRepository(session))
     exposures = await service.evaluate_agent(
         agent_id=agent_id,
         asset_risk_score=int(agent.get("risk_score") or 0),
-        internet_exposed=internet_exposed,
+        internet_exposed=effective_internet_exposed,
+        criticality=criticality,
     )
     return {
         "agent_id": agent_id,
         "evaluated": True,
+        "asset_context": {
+            "criticality": criticality,
+            "internet_exposed": effective_internet_exposed,
+            "asset_risk_score": int(agent.get("risk_score") or 0),
+        },
         "affected_count": len(exposures),
         "exposures": [_exposure_to_dict(item) for item in exposures],
     }

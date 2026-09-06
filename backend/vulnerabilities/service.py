@@ -9,6 +9,14 @@ from db.repositories.vulnerability_repository import PostgresVulnerabilityReposi
 from vulnerabilities.matcher import match_software_to_rule
 
 
+CRITICALITY_WEIGHTS: dict[str, int] = {
+    "LOW": 0,
+    "MEDIUM": 4,
+    "HIGH": 8,
+    "CRITICAL": 12,
+}
+
+
 class VulnerabilityService:
     def __init__(self, repository: PostgresVulnerabilityRepository) -> None:
         self._repository = repository
@@ -52,8 +60,9 @@ class VulnerabilityService:
         agent_id: str,
         asset_risk_score: int = 0,
         internet_exposed: bool = False,
+        criticality: str | None = None,
     ) -> list[AssetVulnerabilityModel]:
-        """Match an agent's inventory against stored affected CPE/version rules."""
+        """Match an asset inventory against stored affected-product rules."""
         inventory = await self._repository.list_software_inventory(agent_id)
         vulnerabilities = await self._repository.list_all_vulnerabilities()
         exposures: list[AssetVulnerabilityModel] = []
@@ -67,6 +76,10 @@ class VulnerabilityService:
                         vendor=software.vendor,
                         product=software.product,
                         version=software.version,
+                        cpe=software.cpe,
+                        purl=software.purl,
+                        ecosystem=software.ecosystem,
+                        package_name=software.package_name,
                         rule=rule,
                     )
                     if not matched:
@@ -84,6 +97,7 @@ class VulnerabilityService:
                 exploit_available=vuln.exploit_available,
                 internet_exposed=internet_exposed,
                 asset_risk_score=asset_risk_score,
+                criticality=criticality,
             )
             exposure = await self._repository.upsert_exposure(
                 {
@@ -98,6 +112,9 @@ class VulnerabilityService:
                         "product": software.product,
                         "version": software.version,
                         "package_name": software.package_name,
+                        "ecosystem": software.ecosystem,
+                        "purl": software.purl,
+                        "cpe": software.cpe,
                     },
                     "rationale": rationale,
                     "last_evaluated": datetime.now(timezone.utc),
@@ -117,11 +134,13 @@ class VulnerabilityService:
         exploit_available: bool,
         internet_exposed: bool,
         asset_risk_score: int = 0,
+        criticality: str | None = None,
     ) -> int:
-        """Return a 0-100 prioritization score for an affected asset.
+        """Return a deterministic 0-100 exposure prioritization score.
 
-        This is intentionally deterministic so analysts can explain why an
-        exposure was prioritized. It is not a replacement for CVSS.
+        ``criticality=None`` and unknown values are neutral. Only validated
+        asset criticality values contribute extra weight, preventing malformed
+        metadata from changing prioritization unexpectedly.
         """
         score = int((cvss_score or 0.0) * 6)
         if known_exploited:
@@ -130,5 +149,8 @@ class VulnerabilityService:
             score += 10
         if internet_exposed:
             score += 10
+
+        if criticality is not None:
+            score += CRITICALITY_WEIGHTS.get(str(criticality).upper(), 0)
         score += min(max(asset_risk_score, 0), 100) // 10
         return min(score, 100)
