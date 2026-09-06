@@ -16,6 +16,7 @@ class PortScanDetectionRule(ThresholdWindowRule):
         distinct_ports_threshold: int = 10,
         window_seconds: float = 60.0,
         severity: Severity = Severity.HIGH,
+        cooldown_seconds: float = 180.0,
     ) -> None:
         super().__init__(
             rule_id=rule_id,
@@ -35,4 +36,5 @@ class PortScanDetectionRule(ThresholdWindowRule):
                 "inside the configured sliding window."
             ),
             context={"detection_basis": "distinct_destination_ports"},
+            cooldown_seconds=cooldown_seconds,
         )
