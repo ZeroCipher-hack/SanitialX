@@ -7,11 +7,12 @@ from typing import Annotated, Any
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from api.deps import get_current_user, get_db_session
+from api.deps import get_current_user, get_db_session, require_role
 from core.security import TokenPayload
 from db.repositories.agent_repository import PostgresAgentRepository
 from db.repositories.vulnerability_repository import PostgresVulnerabilityRepository
 from vulnerabilities.service import VulnerabilityService
+from vulnerabilities.sync import VulnerabilitySyncService
 
 router = APIRouter(prefix="/vulnerabilities", tags=["Vulnerability Intelligence"])
 
@@ -85,6 +86,18 @@ async def list_exposures(
         offset=offset,
     )
     return [_exposure_to_dict(item) for item in items]
+
+
+@router.post("/sync")
+async def sync_vulnerabilities(
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+    _user: Annotated[TokenPayload, Depends(require_role(["admin"]))],
+    hours: int = Query(default=24, ge=1, le=720),
+    max_pages: int = Query(default=10, ge=1, le=100),
+) -> dict[str, Any]:
+    """Synchronize recent NVD CVEs and enrich stored records with CISA KEV."""
+    service = VulnerabilitySyncService(PostgresVulnerabilityRepository(session))
+    return await service.sync_recent(hours=hours, max_pages=max_pages)
 
 
 @router.post("/evaluate/{agent_id}")
