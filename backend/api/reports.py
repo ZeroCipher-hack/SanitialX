@@ -10,6 +10,7 @@ from core.config import get_settings
 from core.security import TokenPayload
 from db.repositories.incident_repository import PostgresIncidentRepository
 from db.repositories.soar_repository import PostgresSoarRepository
+from db.repositories.vulnerability_repository import PostgresVulnerabilityRepository
 from services.ai_analysis import AIIncidentAnalysis, analyze_incident, fallback_analysis
 from services.report_renderer import render_incident_report
 logger=logging.getLogger(__name__);router=APIRouter(prefix="/reports",tags=["Investigation Reports"])
@@ -23,6 +24,16 @@ async def _analyze(inc)->AIIncidentAnalysis:
     if not settings.gemini_api_key:return fallback_analysis(inc)
     try:return await asyncio.to_thread(analyze_incident,inc,api_key=settings.gemini_api_key,model=settings.gemini_model)
     except Exception:logger.exception("Gemini incident analysis failed for %s",inc.incident_id);return fallback_analysis(inc)
+
+async def _vulnerability_evidence(session:AsyncSession,inc)->list[dict]:
+    """Return deterministic exposure evidence when an incident came from CVE correlation."""
+    context=inc.context or {};cve_id=str(context.get("cve_id") or "").upper();agent_id=str(context.get("agent_id") or "")
+    if not cve_id or not agent_id:return []
+    repo=PostgresVulnerabilityRepository(session);vulnerability=await repo.get_vulnerability(cve_id)
+    exposures=await repo.list_asset_exposures(agent_id=agent_id,min_risk_score=0,limit=500)
+    exposure=next((item for item in exposures if item.cve_id.upper()==cve_id),None)
+    if vulnerability is None or exposure is None:return []
+    return [{"cve_id":vulnerability.cve_id,"agent_id":agent_id,"severity":vulnerability.severity,"cvss_score":vulnerability.cvss_score,"known_exploited":vulnerability.known_exploited,"exploit_available":vulnerability.exploit_available,"exposure_status":exposure.status,"risk_score":exposure.risk_score,"match_confidence":exposure.match_confidence,"internet_exposed":exposure.internet_exposed,"matched_software":exposure.matched_software,"rationale":exposure.rationale,"event_evidence_score":context.get("event_evidence_score")}]
 
 @router.get("")
 async def list_reports(repo:Annotated[PostgresIncidentRepository,Depends(get_incident_repository)],_user:Annotated[TokenPayload,Depends(get_current_user)],limit:int=Query(default=50,ge=1,le=500),offset:int=Query(default=0,ge=0)):
@@ -46,7 +57,6 @@ async def get_printable_report(incident_id:str,session:Annotated[AsyncSession,De
     action_rows=[{"action_type":a.action_type,"target_value":a.target_value,"status":a.status,"approved_by":a.approved_by,"rejected_by":a.rejected_by} for a in actions]
     timeline=[{"timestamp":inc.created_at.isoformat(),"event":"INCIDENT_CREATED","actor":"SanitialX","details":inc.title},{"timestamp":inc.updated_at.isoformat(),"event":"INCIDENT_UPDATED","actor":"SanitialX","details":inc.status.value}]
     for action in actions:
-        for audit in await soar_repo.audit(action.action_id):
-            timeline.append({"timestamp":audit.created_at.isoformat(),"event":audit.event,"actor":audit.actor,"details":audit.details})
-    timeline.sort(key=lambda item:item["timestamp"])
-    return HTMLResponse(render_incident_report(report,soar_actions=action_rows,timeline=timeline),headers={"Content-Disposition":f'inline; filename="{report["report_id"]}.html"',"Cache-Control":"no-store"})
+        for audit in await soar_repo.audit(action.action_id):timeline.append({"timestamp":audit.created_at.isoformat(),"event":audit.event,"actor":audit.actor,"details":audit.details})
+    timeline.sort(key=lambda item:item["timestamp"]);vulnerability_evidence=await _vulnerability_evidence(session,inc)
+    return HTMLResponse(render_incident_report(report,soar_actions=action_rows,timeline=timeline,vulnerability_evidence=vulnerability_evidence),headers={"Content-Disposition":f'inline; filename="{report["report_id"]}.html"',"Cache-Control":"no-store"})
