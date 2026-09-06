@@ -39,13 +39,11 @@ class TestPortScanDetectionRule:
         rule = PortScanDetectionRule(distinct_ports_threshold=3, window_seconds=60)
         store = InMemoryCorrelationStateStore()
 
-        # Send 2 events on different ports -> no detection yet
         d1 = rule.evaluate(_make_event(src="1.1.1.1", dport=80), store)
         d2 = rule.evaluate(_make_event(src="1.1.1.1", dport=443), store)
         assert len(d1) == 0
         assert len(d2) == 0
 
-        # Send 3rd event on distinct port -> detection!
         d3 = rule.evaluate(_make_event(src="1.1.1.1", dport=22), store)
         assert len(d3) == 1
         det = d3[0]
@@ -53,6 +51,19 @@ class TestPortScanDetectionRule:
         assert det.severity == Severity.HIGH
         assert det.source_ip == "1.1.1.1"
         assert len(det.triggering_event_ids) == 3
+        assert det.context["distinct_ports_count"] == 3
+        assert det.context["distinct_ports"] == [22, 80, 443]
+
+    def test_repeated_same_port_does_not_trigger_scan(self) -> None:
+        rule = PortScanDetectionRule(distinct_ports_threshold=3, window_seconds=60)
+        store = InMemoryCorrelationStateStore()
+
+        for index in range(5):
+            detections = rule.evaluate(
+                _make_event(event_id=f"same-port-{index}", src="1.1.1.1", dport=443),
+                store,
+            )
+            assert detections == []
 
     def test_deduplication_prevents_false_trigger(self) -> None:
         """Same event redelivered must not count as distinct/new."""
@@ -61,13 +72,11 @@ class TestPortScanDetectionRule:
 
         e1 = _make_event(event_id="e1", src="1.1.1.1", dport=80)
         rule.evaluate(e1, store)
-        # Redeliver e1 multiple times
         rule.evaluate(e1, store)
         rule.evaluate(e1, store)
 
         e2 = _make_event(event_id="e2", src="1.1.1.1", dport=443)
         detections = rule.evaluate(e2, store)
-        # Only 2 distinct events registered so far, threshold is 3
         assert len(detections) == 0
 
 
@@ -86,6 +95,7 @@ class TestSSHBruteForceDetectionRule:
         det = d3[0]
         assert det.source_ip == "2.2.2.2"
         assert det.context["attempts_count"] == 3
+        assert det.context["mitre_technique"] == "T1110"
 
     def test_ignores_non_ssh_ports(self) -> None:
         rule = SSHBruteForceDetectionRule(attempt_threshold=2, window_seconds=60)
