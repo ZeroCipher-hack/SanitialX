@@ -16,7 +16,11 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from api.deps import get_current_user, get_rule_repository, require_role
 from api.schemas import DetectionRuleResponse, DetectionRuleUpdate
 from core.security import TokenPayload
-from db.repositories.rule_repository import PostgresDetectionRuleRepository
+from correlation.enums import Severity
+from db.repositories.rule_repository import (
+    DetectionRuleVersionConflict,
+    PostgresDetectionRuleRepository,
+)
 
 router = APIRouter(prefix="/rules", tags=["Detection Rules"])
 
@@ -56,29 +60,36 @@ async def update_rule(
     repo: Annotated[PostgresDetectionRuleRepository, Depends(get_rule_repository)],
     _user: Annotated[TokenPayload, Depends(require_role(["admin", "analyst"]))],
 ) -> DetectionRuleResponse:
-    """Create or update a detection rule configuration. Requires admin or analyst role."""
+    """Create or update a validated, versioned detection rule configuration."""
     existing = await repo.get_rule(rule_id)
     if existing is None:
         rule_name = payload.rule_name or rule_id
-        severity = payload.severity or "HIGH"
+        severity = payload.severity or Severity.HIGH
         description = payload.description
         enabled = payload.enabled if payload.enabled is not None else True
         parameters = payload.parameters or {}
     else:
         rule_name = payload.rule_name or existing["rule_name"]
-        severity = payload.severity or existing["severity"]
+        severity = payload.severity or Severity(existing["severity"])
         description = payload.description if payload.description is not None else existing["description"]
         enabled = payload.enabled if payload.enabled is not None else existing["enabled"]
         parameters = payload.parameters if payload.parameters is not None else existing["parameters"]
 
-    await repo.save_rule(
-        rule_id=rule_id,
-        rule_name=rule_name,
-        severity=severity,
-        description=description,
-        enabled=enabled,
-        parameters=parameters,
-    )
+    try:
+        await repo.save_rule(
+            rule_id=rule_id,
+            rule_name=rule_name,
+            severity=severity.value,
+            description=description,
+            enabled=enabled,
+            parameters=parameters,
+            expected_version=payload.expected_version,
+        )
+    except DetectionRuleVersionConflict as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(exc),
+        ) from exc
 
     updated = await repo.get_rule(rule_id)
     assert updated is not None
