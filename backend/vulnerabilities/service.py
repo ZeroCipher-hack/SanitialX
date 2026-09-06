@@ -60,7 +60,7 @@ class VulnerabilityService:
         agent_id: str,
         asset_risk_score: int = 0,
         internet_exposed: bool = False,
-        criticality: str = "MEDIUM",
+        criticality: str | None = None,
     ) -> list[AssetVulnerabilityModel]:
         """Match an asset inventory against stored affected CPE/version rules."""
         inventory = await self._repository.list_software_inventory(agent_id)
@@ -127,13 +127,16 @@ class VulnerabilityService:
         exploit_available: bool,
         internet_exposed: bool,
         asset_risk_score: int = 0,
-        criticality: str = "MEDIUM",
+        criticality: str | None = None,
     ) -> int:
         """Return a deterministic 0-100 exposure prioritization score.
 
         CVSS remains vulnerability severity. This score adds exploitation evidence
         and asset context so the SOC can prioritize the same CVE differently on a
         disposable workstation versus a critical internet-facing production host.
+
+        ``criticality=None`` is intentionally neutral for backwards compatibility;
+        callers that know asset criticality pass the stored value explicitly.
         """
         score = int((cvss_score or 0.0) * 6)
         if known_exploited:
@@ -143,6 +146,7 @@ class VulnerabilityService:
         if internet_exposed:
             score += 10
 
-        score += CRITICALITY_WEIGHTS.get(str(criticality).upper(), CRITICALITY_WEIGHTS["MEDIUM"])
+        if criticality is not None:
+            score += CRITICALITY_WEIGHTS.get(str(criticality).upper(), 0)
         score += min(max(asset_risk_score, 0), 100) // 10
         return min(score, 100)
