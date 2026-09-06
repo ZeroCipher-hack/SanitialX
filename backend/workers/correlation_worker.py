@@ -70,7 +70,7 @@ class CorrelationWorker:
     def get_health(self) -> dict[str, Any]:
         """Return health status and processing metrics."""
         with self._lock:
-            return {
+            health = {
                 "running": self._running,
                 "successfully_processing": self._running and self._failures_count == 0,
                 "events_processed": self._events_processed,
@@ -82,6 +82,8 @@ class CorrelationWorker:
                 "failures_count": self._failures_count,
                 "last_error": self._last_error,
             }
+        health["detection_engine"] = self._engine.get_metrics()
+        return health
 
     async def start(self) -> None:
         """Start the background worker consumption loop."""
