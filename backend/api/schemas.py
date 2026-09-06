@@ -7,9 +7,10 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from correlation.enums import Severity
+from correlation.rule_config import validate_rule_parameters
 from incidents.enums import IncidentStatus
 
 
@@ -44,19 +45,28 @@ class DetectionRuleResponse(BaseModel):
     rule_id: str
     rule_name: str
     description: str | None = None
-    severity: str
+    severity: Severity
     enabled: bool
     parameters: dict[str, Any]
+    version: int
     created_at: datetime
     updated_at: datetime
 
 
 class DetectionRuleUpdate(BaseModel):
-    rule_name: str | None = None
-    severity: str | None = None
-    description: str | None = None
+    rule_name: str | None = Field(default=None, min_length=1, max_length=255)
+    severity: Severity | None = None
+    description: str | None = Field(default=None, max_length=512)
     enabled: bool | None = None
     parameters: dict[str, Any] | None = None
+    expected_version: int | None = Field(default=None, ge=0)
+
+    @field_validator("parameters")
+    @classmethod
+    def validate_parameters(cls, value: dict[str, Any] | None) -> dict[str, Any] | None:
+        if value is None:
+            return None
+        return validate_rule_parameters(value)
 
 
 # ── Health Schemas ────────────────────────────────────────────────────────
