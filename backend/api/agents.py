@@ -63,6 +63,7 @@ class AssetMetadataUpdate(BaseModel):
     asset_type: Literal["ENDPOINT", "SERVER", "WORKSTATION", "CLOUD", "NETWORK", "CONTAINER", "OTHER"] | None = None
     criticality: Literal["LOW", "MEDIUM", "HIGH", "CRITICAL"] | None = None
     environment: Literal["PRODUCTION", "STAGING", "DEVELOPMENT", "TEST", "UNKNOWN"] | None = None
+    lifecycle_status: Literal["DISCOVERED", "MANAGED", "RETIRED", "EXCLUDED"] | None = None
     owner: str | None = Field(default=None, max_length=160)
     internet_exposed: bool | None = None
     tags: list[str] | None = Field(default=None, max_length=50)
@@ -88,6 +89,7 @@ async def list_agents(
     asset_type: str | None = None,
     criticality: str | None = None,
     environment: str | None = None,
+    lifecycle_status: str | None = None,
     internet_exposed: bool | None = None,
     q: str | None = Query(default=None, max_length=160),
 ):
@@ -100,6 +102,7 @@ async def list_agents(
         asset_type=asset_type,
         criticality=criticality,
         environment=environment,
+        lifecycle_status=lifecycle_status,
         internet_exposed=internet_exposed,
         query=q,
     )
@@ -109,9 +112,12 @@ async def list_agents(
 async def get_asset_summary(
     session: Annotated[AsyncSession, Depends(get_db_session)],
     _user: Annotated[TokenPayload, Depends(get_current_user)],
+    stale_after_hours: int = Query(default=24, ge=1, le=720),
 ) -> dict[str, int]:
     """Return inventory coverage counters for the SOC dashboard."""
-    return await PostgresAgentRepository(session).get_inventory_summary()
+    return await PostgresAgentRepository(session).get_inventory_summary(
+        stale_after_hours=stale_after_hours
+    )
 
 
 @router.get("/{agent_id}")
@@ -201,9 +207,12 @@ async def replace_software_inventory(
 
     repo = PostgresVulnerabilityRepository(session)
     items = await repo.replace_software_inventory(agent_id, [item.model_dump() for item in payload.software])
+    asset = await agent_repo.touch_inventory(agent_id)
     return {
         "agent_id": agent_id,
         "software_count": len(items),
+        "inventory_updated_at": asset.get("inventory_updated_at") if asset else None,
+        "lifecycle_status": asset.get("lifecycle_status") if asset else None,
         "software": [_software_to_dict(item) for item in items],
     }
 
