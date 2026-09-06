@@ -24,6 +24,7 @@ from db.repositories.user_repository import PostgresUserRepository
 from db.session import DatabaseSessionManager
 from event_bus.base import EventBus
 from event_bus.redis_bus import RedisEventBus, create_redis_client
+from events.persistence import LiveEventPersistenceHook
 from incidents.repository import IncidentRepository
 from incidents.service import IncidentService
 from normalizers.factory import create_default_registry
@@ -109,6 +110,9 @@ class ApplicationContainer:
             ],
         )
 
+        self.live_event_persistence_hook = LiveEventPersistenceHook(
+            self.db_manager.sessionmaker
+        )
         self.live_vulnerability_hook = LiveVulnerabilityCorrelationHook(
             self.db_manager.sessionmaker
         )
@@ -120,6 +124,7 @@ class ApplicationContainer:
                 subscriber=self.event_bus,
                 engine=self.correlation_engine,
                 incident_service=self.incident_service,
+                event_persist_hook=self.live_event_persistence_hook,
                 post_event_hook=self.live_vulnerability_hook,
             )
 
@@ -131,5 +136,6 @@ class ApplicationContainer:
             subscriber=event_bus,
             engine=self.correlation_engine,
             incident_service=self.incident_service,
+            event_persist_hook=self.live_event_persistence_hook,
             post_event_hook=self.live_vulnerability_hook,
         )
