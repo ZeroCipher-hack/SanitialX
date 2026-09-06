@@ -6,8 +6,10 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 from api.deps import get_current_user, get_db_session, require_role
 from core.security import TokenPayload
+from db.repositories.agent_repository import PostgresAgentRepository
 from db.repositories.incident_repository import PostgresIncidentRepository
 from db.repositories.soar_repository import PostgresSoarRepository
+from soar.policy import validate_action_target
 
 router = APIRouter(prefix="/soar", tags=["SOAR"])
 CONTROLLED_ACTIONS = {"BLOCK_IP", "ISOLATE_HOST", "DISABLE_ACCOUNT", "KILL_PROCESS"}
@@ -31,7 +33,21 @@ def serialize(action) -> dict[str, Any]:
 async def create_action(payload:SoarActionCreate,session:Annotated[AsyncSession,Depends(get_db_session)],user:Annotated[TokenPayload,Depends(require_role(["admin","analyst"]))]):
     incident = await PostgresIncidentRepository(session).get_by_id(payload.incident_id)
     if incident is None: raise HTTPException(status_code=404,detail="Incident not found.")
-    action = await PostgresSoarRepository(session).create_action(payload.model_dump(), user.sub)
+    try:
+        target_value = validate_action_target(payload.action_type, payload.target_type, payload.target_value)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    if payload.target_type == "INCIDENT" and target_value != payload.incident_id:
+        raise HTTPException(status_code=422, detail="INCIDENT target must match incident_id.")
+    if payload.target_type == "ASSET":
+        asset = await PostgresAgentRepository(session).get_agent_model(target_value)
+        if asset is None:
+            raise HTTPException(status_code=422, detail="ASSET target must reference an existing SanitialX asset/agent ID.")
+        if not asset.agent_token_hash:
+            raise HTTPException(status_code=422, detail="Controlled ASSET response requires an enrolled endpoint agent.")
+    data = payload.model_dump()
+    data["target_value"] = target_value
+    action = await PostgresSoarRepository(session).create_action(data, user.sub)
     return serialize(action)
 
 @router.get("/actions")
