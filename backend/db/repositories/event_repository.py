@@ -10,6 +10,7 @@ from sqlalchemy import or_, select, desc
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from db.models.event import EventModel
+from events.models import NormalizedEvent
 
 
 class PostgresEventRepository:
@@ -22,6 +23,48 @@ class PostgresEventRepository:
         await self._session.commit()
         await self._session.refresh(model)
         return model
+
+    async def persist_normalized_event(self, event: NormalizedEvent) -> tuple[EventModel, bool]:
+        """Persist a live NormalizedEvent once, keyed by immutable event_id.
+
+        Returns ``(model, created)`` so callers can distinguish a fresh write
+        from a replayed Redis/event-bus delivery without raising a duplicate
+        primary-key error.
+        """
+        existing = await self._session.get(EventModel, event.event_id)
+        if existing is not None:
+            return existing, False
+
+        metadata = event.metadata or {}
+        severity = str(metadata.get("severity") or "INFO").upper()
+        if severity not in {"INFO", "LOW", "MEDIUM", "HIGH", "CRITICAL"}:
+            severity = "INFO"
+
+        details = metadata.get("details") or metadata.get("message")
+        model = EventModel(
+            event_id=event.event_id,
+            timestamp=event.timestamp,
+            event_type=event.event_type,
+            severity=severity,
+            source_ip=event.source_ip,
+            destination_ip=event.destination_ip,
+            user=metadata.get("user") or metadata.get("username"),
+            host=metadata.get("host") or metadata.get("hostname"),
+            rule_id=metadata.get("rule_id"),
+            mitre_technique=metadata.get("mitre_technique"),
+            details=str(details) if details is not None else None,
+            raw_payload={
+                "sensor_id": event.sensor_id,
+                "source_port": event.source_port,
+                "destination_port": event.destination_port,
+                "protocol": event.protocol,
+                "metadata": metadata,
+            },
+        )
+        self._session.add(model)
+        await self._session.commit()
+        await self._session.refresh(model)
+        return model, True
 
     async def list_events(
         self,
