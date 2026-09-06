@@ -34,3 +34,17 @@ class SoarAuditModel(Base):
     event: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
     details: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
+
+class AgentCommandModel(Base):
+    """Approved, server-issued endpoint command. v1 only allows read-only command kinds."""
+    __tablename__ = "agent_commands"
+    command_id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    agent_id: Mapped[str] = mapped_column(String(64), ForeignKey("agents.agent_id", ondelete="CASCADE"), index=True)
+    action_id: Mapped[str] = mapped_column(String(36), ForeignKey("soar_actions.action_id", ondelete="CASCADE"), index=True)
+    command_type: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    payload: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False, default=dict)
+    status: Mapped[str] = mapped_column(String(24), nullable=False, default="QUEUED", index=True)
+    result: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
+    claimed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
