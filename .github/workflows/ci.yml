@@ -78,6 +78,26 @@ jobs:
       - name: Verify Alembic current revision
         run: alembic current
 
+  linux-agent:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: agent/linux
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Compile Linux agent
+        run: python -m py_compile sanitialx_agent.py
+
+      - name: Run Linux agent collector tests
+        run: python -m unittest -v test_sanitialx_agent.py
+
   frontend:
     runs-on: ubuntu-latest
     defaults:
