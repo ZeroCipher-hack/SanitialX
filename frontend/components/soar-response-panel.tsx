@@ -218,7 +218,7 @@ export function SoarResponsePanel({
                     <button className="refresh" onClick={() => void transition(action, 'reject')} disabled={busy}><X size={12} /> Reject</button>
                   </>}
                   {action.status === 'APPROVED' && <button className="refresh" onClick={() => void transition(action, 'execute')} disabled={busy}>{busy ? <Loader2 size={12} className="animate-spin" /> : <Play size={12} />} Execute</button>}
-                  {action.status === 'EXECUTED' && action.execution_result?.mode && <span className="soon-badge"><ShieldAlert size={11} /> {String(action.execution_result.mode)}</span>}
+                  {action.status === 'EXECUTED' && Boolean(action.execution_result?.mode) && <span className="soon-badge"><ShieldAlert size={11} /> {String(action.execution_result?.mode)}</span>}
                 </div>
               </div>
             );
