@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from sqlalchemy import desc, func, or_, select
+from sqlalchemy import desc, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from db.models.agent import AgentModel
@@ -58,6 +58,21 @@ class PostgresAgentRepository:
         model.last_seen = datetime.now(timezone.utc)
         model.status = "ONLINE"
         await self._session.commit(); await self._session.refresh(model); return model
+
+    async def mark_stale_agents_offline(self, *, timeout_seconds: int) -> int:
+        """Mark enrolled ONLINE agents OFFLINE after missing their heartbeat deadline."""
+        stale_before = datetime.now(timezone.utc) - timedelta(seconds=max(1, timeout_seconds))
+        result = await self._session.execute(
+            update(AgentModel)
+            .where(
+                AgentModel.agent_token_hash.is_not(None),
+                AgentModel.status == "ONLINE",
+                AgentModel.last_seen < stale_before,
+            )
+            .values(status="OFFLINE")
+        )
+        await self._session.commit()
+        return int(result.rowcount or 0)
 
     async def list_agents(self,limit:int=50,offset:int=0,*,status:str|None=None,asset_type:str|None=None,criticality:str|None=None,environment:str|None=None,lifecycle_status:str|None=None,internet_exposed:bool|None=None,query:str|None=None)->list[dict[str,Any]]:
         stmt=select(AgentModel)
