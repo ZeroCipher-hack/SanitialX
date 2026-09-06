@@ -2,8 +2,8 @@
 
 import { Suspense, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Search, RefreshCw, ChevronDown, Eye, X, Loader2, AlertCircle } from 'lucide-react';
-import { api, updateIncidentStatus } from '@/lib/api';
+import { Search, RefreshCw, ChevronDown, Eye, X, Loader2, AlertCircle, Printer } from 'lucide-react';
+import { api, openPrintableReport, updateIncidentStatus } from '@/lib/api';
 import { SoarResponsePanel } from '@/components/soar-response-panel';
 import type { Incident, IncidentStatus, Severity } from '@/types/api';
 
@@ -38,6 +38,7 @@ function IncidentsContent() {
   const [selectedIncident, setSelectedIncident] = useState<Incident | null>(null);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [reportingId, setReportingId] = useState<string | null>(null);
 
   const load = () => {
     setLoading(true);
@@ -71,6 +72,18 @@ function IncidentsContent() {
       setActionError(`[${incident.incident_id}] ${msg}`);
     } finally {
       setUpdatingId(null);
+    }
+  };
+
+  const handlePrintReport = async (incident: Incident) => {
+    setReportingId(incident.incident_id);
+    setActionError(null);
+    try {
+      await openPrintableReport(incident.incident_id);
+    } catch (err: unknown) {
+      setActionError(err instanceof Error ? err.message : 'Failed to generate printable report.');
+    } finally {
+      setReportingId(null);
     }
   };
 
@@ -200,7 +213,13 @@ function IncidentsContent() {
               <SoarResponsePanel incidentId={selectedIncident.incident_id} sourceIp={selectedIncident.source_ip} destinationIp={selectedIncident.destination_ip} />
             </div>
 
-            <div className="modal-actions"><button className="btn-secondary" onClick={() => setSelectedIncident(null)}>Close</button></div>
+            <div className="modal-actions">
+              <button className="refresh" onClick={() => handlePrintReport(selectedIncident)} disabled={reportingId === selectedIncident.incident_id}>
+                {reportingId === selectedIncident.incident_id ? <Loader2 size={14} className="animate-spin" /> : <Printer size={14} />}
+                {reportingId === selectedIncident.incident_id ? 'Generating…' : 'Generate / Print Report'}
+              </button>
+              <button className="btn-secondary" onClick={() => setSelectedIncident(null)}>Close</button>
+            </div>
           </div>
         </div>
       )}
