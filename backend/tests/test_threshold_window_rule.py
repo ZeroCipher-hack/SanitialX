@@ -20,9 +20,13 @@ def _event(event_id: str, ts: datetime, source_ip: str = "10.0.0.5") -> Normaliz
     )
 
 
-def _rule(threshold: int = 3, window_seconds: float = 300) -> ThresholdWindowRule:
+def _rule(
+    threshold: int = 3,
+    window_seconds: float = 300,
+    rule_id: str = "auth.bruteforce.generic",
+) -> ThresholdWindowRule:
     return ThresholdWindowRule(
-        rule_id="auth.bruteforce.generic",
+        rule_id=rule_id,
         rule_name="Repeated Authentication Failures",
         threshold=threshold,
         window_seconds=window_seconds,
@@ -70,7 +74,7 @@ def test_threshold_rule_groups_sources_independently() -> None:
     assert detections[0].context["group"] == "10.0.0.1"
 
 
-def test_threshold_rule_deduplicates_event_ids() -> None:
+def test_threshold_rule_deduplicates_event_ids_within_same_rule_key() -> None:
     store = InMemoryCorrelationStateStore()
     rule = _rule(threshold=2)
     now = datetime.now(timezone.utc)
@@ -78,6 +82,21 @@ def test_threshold_rule_deduplicates_event_ids() -> None:
 
     assert rule.evaluate(duplicate, store) == []
     assert rule.evaluate(duplicate, store) == []
+
+
+def test_same_event_can_participate_in_multiple_rules() -> None:
+    store = InMemoryCorrelationStateStore()
+    first_rule = _rule(threshold=1, rule_id="auth.rule.one")
+    second_rule = _rule(threshold=1, rule_id="auth.rule.two")
+    event = _event("shared-event", datetime.now(timezone.utc))
+
+    first = first_rule.evaluate(event, store)
+    second = second_rule.evaluate(event, store)
+
+    assert len(first) == 1
+    assert len(second) == 1
+    assert first[0].rule_id == "auth.rule.one"
+    assert second[0].rule_id == "auth.rule.two"
 
 
 def test_threshold_rule_ignores_non_matching_events() -> None:
