@@ -20,6 +20,8 @@ class PostgresAgentRepository:
         existing = await self._session.get(AgentModel, agent_id)
         if existing:
             for k, v in agent_data.items():
+                if k == "first_seen":
+                    continue
                 if hasattr(existing, k):
                     setattr(existing, k, v)
             model = existing
@@ -27,6 +29,58 @@ class PostgresAgentRepository:
             model = AgentModel(**agent_data)
             self._session.add(model)
 
+        await self._session.commit()
+        await self._session.refresh(model)
+        return model
+
+    async def enroll_agent(self, agent_data: dict[str, Any], token_hash: str) -> AgentModel:
+        """Create or re-enroll an endpoint while preserving SOC-managed metadata."""
+        now = datetime.now(timezone.utc)
+        agent_id = agent_data["agent_id"]
+        model = await self._session.get(AgentModel, agent_id)
+        if model is None:
+            model = AgentModel(
+                **agent_data,
+                status="ONLINE",
+                source="agent",
+                lifecycle_status="DISCOVERED",
+                agent_token_hash=token_hash,
+                enrolled_at=now,
+                last_seen=now,
+            )
+            self._session.add(model)
+        else:
+            for key in ("hostname", "ip_address", "os", "agent_version"):
+                if key in agent_data:
+                    setattr(model, key, agent_data[key])
+            model.agent_token_hash = token_hash
+            model.enrolled_at = now
+            model.last_seen = now
+            model.status = "ONLINE"
+        await self._session.commit()
+        await self._session.refresh(model)
+        return model
+
+    async def heartbeat_agent(
+        self,
+        agent_id: str,
+        *,
+        cpu_usage: float,
+        memory_usage: float,
+        agent_version: str | None = None,
+        ip_address: str | None = None,
+    ) -> AgentModel | None:
+        model = await self._session.get(AgentModel, agent_id)
+        if model is None:
+            return None
+        model.last_seen = datetime.now(timezone.utc)
+        model.status = "ONLINE"
+        model.cpu_usage = cpu_usage
+        model.memory_usage = memory_usage
+        if agent_version:
+            model.agent_version = agent_version
+        if ip_address:
+            model.ip_address = ip_address
         await self._session.commit()
         await self._session.refresh(model)
         return model
@@ -72,49 +126,17 @@ class PostgresAgentRepository:
         return [row.to_dict() for row in result.scalars().all()]
 
     async def get_inventory_summary(self, *, stale_after_hours: int = 24) -> dict[str, int]:
-        """Return aggregate SOC asset coverage counters using DB-side counts."""
         stale_before = datetime.now(timezone.utc) - timedelta(hours=max(stale_after_hours, 1))
         total = await self._session.scalar(select(func.count()).select_from(AgentModel))
-        critical = await self._session.scalar(
-            select(func.count()).select_from(AgentModel).where(AgentModel.criticality == "CRITICAL")
-        )
-        internet_facing = await self._session.scalar(
-            select(func.count()).select_from(AgentModel).where(AgentModel.internet_exposed.is_(True))
-        )
-        offline = await self._session.scalar(
-            select(func.count()).select_from(AgentModel).where(AgentModel.status == "OFFLINE")
-        )
-        high_risk = await self._session.scalar(
-            select(func.count()).select_from(AgentModel).where(AgentModel.risk_score >= 70)
-        )
-        production = await self._session.scalar(
-            select(func.count()).select_from(AgentModel).where(AgentModel.environment == "PRODUCTION")
-        )
-        managed = await self._session.scalar(
-            select(func.count()).select_from(AgentModel).where(AgentModel.lifecycle_status == "MANAGED")
-        )
-        retired = await self._session.scalar(
-            select(func.count()).select_from(AgentModel).where(AgentModel.lifecycle_status == "RETIRED")
-        )
-        stale_inventory = await self._session.scalar(
-            select(func.count()).select_from(AgentModel).where(
-                or_(
-                    AgentModel.inventory_updated_at.is_(None),
-                    AgentModel.inventory_updated_at < stale_before,
-                )
-            )
-        )
-        return {
-            "total_assets": int(total or 0),
-            "critical_assets": int(critical or 0),
-            "internet_facing_assets": int(internet_facing or 0),
-            "offline_assets": int(offline or 0),
-            "high_risk_assets": int(high_risk or 0),
-            "production_assets": int(production or 0),
-            "managed_assets": int(managed or 0),
-            "retired_assets": int(retired or 0),
-            "stale_inventory_assets": int(stale_inventory or 0),
-        }
+        critical = await self._session.scalar(select(func.count()).select_from(AgentModel).where(AgentModel.criticality == "CRITICAL"))
+        internet_facing = await self._session.scalar(select(func.count()).select_from(AgentModel).where(AgentModel.internet_exposed.is_(True)))
+        offline = await self._session.scalar(select(func.count()).select_from(AgentModel).where(AgentModel.status == "OFFLINE"))
+        high_risk = await self._session.scalar(select(func.count()).select_from(AgentModel).where(AgentModel.risk_score >= 70))
+        production = await self._session.scalar(select(func.count()).select_from(AgentModel).where(AgentModel.environment == "PRODUCTION"))
+        managed = await self._session.scalar(select(func.count()).select_from(AgentModel).where(AgentModel.lifecycle_status == "MANAGED"))
+        retired = await self._session.scalar(select(func.count()).select_from(AgentModel).where(AgentModel.lifecycle_status == "RETIRED"))
+        stale_inventory = await self._session.scalar(select(func.count()).select_from(AgentModel).where(or_(AgentModel.inventory_updated_at.is_(None), AgentModel.inventory_updated_at < stale_before)))
+        return {"total_assets":int(total or 0),"critical_assets":int(critical or 0),"internet_facing_assets":int(internet_facing or 0),"offline_assets":int(offline or 0),"high_risk_assets":int(high_risk or 0),"production_assets":int(production or 0),"managed_assets":int(managed or 0),"retired_assets":int(retired or 0),"stale_inventory_assets":int(stale_inventory or 0)}
 
     async def get_agent(self, agent_id: str) -> dict[str, Any] | None:
         model = await self._session.get(AgentModel, agent_id)
@@ -127,38 +149,20 @@ class PostgresAgentRepository:
         model = await self._session.get(AgentModel, agent_id)
         if model is None:
             return None
-        allowed = {
-            "asset_type",
-            "criticality",
-            "environment",
-            "owner",
-            "internet_exposed",
-            "tags",
-            "lifecycle_status",
-        }
+        allowed = {"asset_type","criticality","environment","owner","internet_exposed","tags","lifecycle_status"}
         for key, value in changes.items():
             if key in allowed:
                 setattr(model, key, value)
-        await self._session.commit()
-        await self._session.refresh(model)
-        return model.to_dict()
+        await self._session.commit(); await self._session.refresh(model); return model.to_dict()
 
     async def touch_inventory(self, agent_id: str, *, mark_managed: bool = True) -> dict[str, Any] | None:
         model = await self._session.get(AgentModel, agent_id)
-        if model is None:
-            return None
+        if model is None: return None
         model.inventory_updated_at = datetime.now(timezone.utc)
-        if mark_managed and model.lifecycle_status == "DISCOVERED":
-            model.lifecycle_status = "MANAGED"
-        await self._session.commit()
-        await self._session.refresh(model)
-        return model.to_dict()
+        if mark_managed and model.lifecycle_status == "DISCOVERED": model.lifecycle_status = "MANAGED"
+        await self._session.commit(); await self._session.refresh(model); return model.to_dict()
 
     async def get_agent_by_ip(self, ip_address: str | None) -> dict[str, Any] | None:
-        if not ip_address:
-            return None
-        result = await self._session.execute(
-            select(AgentModel).where(AgentModel.ip_address == ip_address).limit(1)
-        )
-        model = result.scalar_one_or_none()
-        return model.to_dict() if model else None
+        if not ip_address: return None
+        result = await self._session.execute(select(AgentModel).where(AgentModel.ip_address == ip_address).limit(1))
+        model = result.scalar_one_or_none(); return model.to_dict() if model else None
