@@ -92,7 +92,7 @@ The architecture is designed so additional detection rules can be added without 
 ### 1. Configure environment
 
 ```bash
-cp backend/.env.example .env
+cp backend/.env.example backend/.env
 ```
 
 Review the environment values and replace development secrets before using the stack outside local development.
@@ -110,6 +110,7 @@ The Compose stack includes:
 - `migrate` — Alembic migration job
 - `backend` — FastAPI API on port `8000`
 - `worker` — background correlation worker
+- `vulnerability-scheduler` — CVE intelligence synchronization
 
 ### 3. Check service health
 
@@ -126,15 +127,51 @@ curl -H "Authorization: Bearer <JWT_TOKEN>" \
 
 ## Authentication
 
+Create the first operator locally. There is intentionally no public self-service admin signup endpoint.
+
+```bash
+docker compose exec backend python -m scripts.create_user --username admin --role admin
+```
+
 Obtain a JWT token through the authentication endpoint:
 
 ```bash
 curl -X POST http://localhost:8000/api/v1/auth/token \
   -H "Content-Type: application/json" \
-  -d '{"username":"analyst_jane","password":"secret_password","requested_role":"analyst"}'
+  -d '{"username":"admin","password":"YOUR_PASSWORD"}'
 ```
 
 Use the returned token as a Bearer token for protected endpoints.
+
+## Final Docker Smoke Test
+
+After the stack is up and an analyst/admin operator exists, run the production-style smoke test from the repository root:
+
+```bash
+export SANITIALX_SMOKE_USERNAME=admin
+export SANITIALX_SMOKE_PASSWORD='YOUR_PASSWORD'
+python3 scripts/docker_smoke_test.py
+```
+
+Optional API override:
+
+```bash
+export SANITIALX_BASE_URL=http://127.0.0.1:8000
+```
+
+The smoke test validates:
+
+- Docker Compose services are visible
+- public health endpoint
+- JWT authentication
+- authenticated readiness
+- controlled attack simulation
+- incident persistence and retrieval
+- approval-based SOAR lifecycle using only the non-destructive `NOTIFY_ANALYST` action
+- SOAR audit trail
+- professional printable incident report
+
+The script does **not** send an endpoint command, execute arbitrary shell/PowerShell, or enable destructive response actions. It creates synthetic demo data in the local SanitialX database.
 
 ## Testing
 
@@ -178,9 +215,9 @@ Security-sensitive reports should be submitted privately. See [`SECURITY.md`](SE
 ```text
 SanitialX/
 ├── backend/
-│   ├── app/
-│   ├── tests/
-│   └── migrations/
+├── agent/
+├── frontend/
+├── scripts/
 ├── docker-compose.yml
 ├── docker-compose.test.yml
 └── README.md
