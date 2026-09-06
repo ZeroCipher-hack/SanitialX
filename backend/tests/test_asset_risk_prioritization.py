@@ -37,7 +37,7 @@ def test_known_exploited_critical_public_asset_caps_at_100() -> None:
     assert score == 100
 
 
-def test_unknown_criticality_uses_medium_weight() -> None:
+def test_unknown_criticality_is_neutral() -> None:
     unknown = VulnerabilityService.calculate_risk_score(
         cvss_score=5.0,
         known_exploited=False,
@@ -55,4 +55,5 @@ def test_unknown_criticality_uses_medium_weight() -> None:
         criticality="MEDIUM",
     )
 
-    assert unknown == medium == 34
+    assert unknown == 30
+    assert medium == 34
