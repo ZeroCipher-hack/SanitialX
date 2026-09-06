@@ -17,11 +17,42 @@ router = APIRouter(prefix="/agents", tags=["Assets & Endpoints"])
 
 
 class SoftwareInventoryItem(BaseModel):
-    vendor: str = ""
+    vendor: str = Field(default="", max_length=120)
     product: str = Field(..., min_length=1, max_length=160)
     version: str = Field(..., min_length=1, max_length=80)
     package_name: str | None = Field(default=None, max_length=180)
+    ecosystem: str | None = Field(default=None, max_length=40)
+    purl: str | None = Field(default=None, max_length=512)
+    cpe: str | None = Field(default=None, max_length=512)
     source: str = Field(default="agent", max_length=40)
+
+    @field_validator("ecosystem")
+    @classmethod
+    def normalize_ecosystem(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = value.strip().lower()
+        return normalized or None
+
+    @field_validator("purl")
+    @classmethod
+    def validate_purl(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = value.strip()
+        if normalized and not normalized.startswith("pkg:"):
+            raise ValueError("purl must start with 'pkg:'")
+        return normalized or None
+
+    @field_validator("cpe")
+    @classmethod
+    def validate_cpe(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = value.strip()
+        if normalized and not normalized.startswith("cpe:2.3:"):
+            raise ValueError("cpe must use CPE 2.3 format")
+        return normalized or None
 
 
 class SoftwareInventoryPayload(BaseModel):
@@ -142,6 +173,20 @@ async def update_asset_metadata(
     return updated
 
 
+def _software_to_dict(item: Any) -> dict[str, Any]:
+    return {
+        "vendor": item.vendor,
+        "product": item.product,
+        "version": item.version,
+        "package_name": item.package_name,
+        "ecosystem": item.ecosystem,
+        "purl": item.purl,
+        "cpe": item.cpe,
+        "source": item.source,
+        "last_seen": item.last_seen,
+    }
+
+
 @router.put("/{agent_id}/software")
 async def replace_software_inventory(
     agent_id: str,
@@ -159,17 +204,7 @@ async def replace_software_inventory(
     return {
         "agent_id": agent_id,
         "software_count": len(items),
-        "software": [
-            {
-                "vendor": item.vendor,
-                "product": item.product,
-                "version": item.version,
-                "package_name": item.package_name,
-                "source": item.source,
-                "last_seen": item.last_seen,
-            }
-            for item in items
-        ],
+        "software": [_software_to_dict(item) for item in items],
     }
 
 
@@ -188,15 +223,5 @@ async def get_software_inventory(
     return {
         "agent_id": agent_id,
         "software_count": len(items),
-        "software": [
-            {
-                "vendor": item.vendor,
-                "product": item.product,
-                "version": item.version,
-                "package_name": item.package_name,
-                "source": item.source,
-                "last_seen": item.last_seen,
-            }
-            for item in items
-        ],
+        "software": [_software_to_dict(item) for item in items],
     }
