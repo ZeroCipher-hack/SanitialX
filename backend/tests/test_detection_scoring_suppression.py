@@ -74,7 +74,11 @@ def test_engine_suppresses_repeat_detection_inside_cooldown() -> None:
     assert len(first) == 1
     assert second == []
     assert first[0].context["risk_score"] >= 70
-    assert engine.get_metrics()["suppressed_detections"] == 1
+    metrics = engine.get_metrics()
+    assert metrics["suppressed_detections"] == 1
+    assert metrics["events_processed"] == 2
+    assert metrics["processing_avg_ms"] >= 0
+    assert metrics["processing_max_ms"] >= metrics["processing_avg_ms"]
 
 
 def test_suppressed_primary_detection_still_advances_sequence() -> None:
