@@ -1,5 +1,5 @@
 """
-SQLAlchemy database model for Endpoint Agents.
+SQLAlchemy database model for managed endpoint assets / agents.
 """
 
 from __future__ import annotations
@@ -7,7 +7,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any
 
-from sqlalchemy import DateTime, Float, Integer, String
+from sqlalchemy import Boolean, DateTime, Float, Integer, JSON, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from db.base import Base
@@ -18,16 +18,29 @@ class AgentModel(Base):
 
     agent_id: Mapped[str] = mapped_column(String(64), primary_key=True)
     hostname: Mapped[str] = mapped_column(String(100), index=True)
-    ip_address: Mapped[str] = mapped_column(String(45))
+    ip_address: Mapped[str] = mapped_column(String(45), index=True)
     os: Mapped[str] = mapped_column(String(100))
-    status: Mapped[str] = mapped_column(String(20), default="ONLINE", index=True)  # ONLINE, OFFLINE, WARNING, COMPROMISED
+    status: Mapped[str] = mapped_column(String(20), default="ONLINE", index=True)
     last_seen: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), index=True
     )
     cpu_usage: Mapped[float] = mapped_column(Float, default=0.0)
     memory_usage: Mapped[float] = mapped_column(Float, default=0.0)
-    risk_score: Mapped[int] = mapped_column(Integer, default=0)
+    risk_score: Mapped[int] = mapped_column(Integer, default=0, index=True)
     events_count: Mapped[int] = mapped_column(Integer, default=0)
+
+    # Asset-management metadata. Agent identity remains the source of truth so
+    # vulnerability/software relations do not need a parallel asset table.
+    asset_type: Mapped[str] = mapped_column(String(32), default="ENDPOINT", index=True)
+    criticality: Mapped[str] = mapped_column(String(20), default="MEDIUM", index=True)
+    environment: Mapped[str] = mapped_column(String(32), default="UNKNOWN", index=True)
+    owner: Mapped[str | None] = mapped_column(String(160), nullable=True)
+    internet_exposed: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    tags: Mapped[list[str]] = mapped_column(JSON, default=list)
+    source: Mapped[str] = mapped_column(String(40), default="agent")
+    first_seen: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -41,4 +54,12 @@ class AgentModel(Base):
             "memory_usage": self.memory_usage,
             "risk_score": self.risk_score,
             "events_count": self.events_count,
+            "asset_type": self.asset_type,
+            "criticality": self.criticality,
+            "environment": self.environment,
+            "owner": self.owner,
+            "internet_exposed": self.internet_exposed,
+            "tags": list(self.tags or []),
+            "source": self.source,
+            "first_seen": self.first_seen.isoformat() if self.first_seen else None,
         }
