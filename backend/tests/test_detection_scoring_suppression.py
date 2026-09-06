@@ -11,6 +11,8 @@ from correlation.sequence import DetectionSequenceRule, SequenceStage
 from correlation.state import InMemoryCorrelationStateStore
 from events.models import NormalizedEvent
 
+_BASE_TIME = datetime.now(timezone.utc)
+
 
 def _detection(*, severity: Severity = Severity.HIGH, seconds: int = 0) -> Detection:
     return Detection(
@@ -19,7 +21,7 @@ def _detection(*, severity: Severity = Severity.HIGH, seconds: int = 0) -> Detec
         severity=severity,
         title="X",
         description="X",
-        timestamp=datetime(2026, 1, 1, tzinfo=timezone.utc) + timedelta(seconds=seconds),
+        timestamp=_BASE_TIME + timedelta(seconds=seconds),
         source_ip="1.2.3.4",
         triggering_event_ids=["e1", "e2", "e3"],
         context={"threshold": 3, "event_count": 3, "mitre_technique": "T1110"},
@@ -38,7 +40,7 @@ def _event(event_id: str, seconds: int) -> NormalizedEvent:
     return NormalizedEvent(
         event_id=event_id,
         event_type="AUTH_FAILURE",
-        timestamp=datetime(2026, 1, 1, tzinfo=timezone.utc) + timedelta(seconds=seconds),
+        timestamp=_BASE_TIME + timedelta(seconds=seconds),
         source_ip="5.5.5.5",
         destination_ip="10.0.0.1",
         sensor_id="sensor",
@@ -86,7 +88,8 @@ def test_suppressed_primary_detection_still_advances_sequence() -> None:
                 threshold=1,
                 window_seconds=60,
                 severity=Severity.HIGH,
-                predicate=lambda event: event.event_type == "AUTH_FAILURE" and event.metadata.get("stage") == "b",
+                predicate=lambda event: event.event_type == "AUTH_FAILURE"
+                and event.metadata.get("stage") == "b",
                 group_by=lambda event: event.source_ip,
                 title="B",
                 description="B",
