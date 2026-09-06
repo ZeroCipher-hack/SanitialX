@@ -39,7 +39,8 @@ function Protect-File([string]$Path) {
 function Write-SecureText([string]$Path, [string]$Value) {
     Ensure-StateDirectory
     $tmp = "$Path.tmp"
-    [System.IO.File]::WriteAllText($tmp, $Value, [System.Text.UTF8Encoding]::new($false))
+    $utf8 = New-Object System.Text.UTF8Encoding($false)
+    [System.IO.File]::WriteAllText($tmp, $Value, $utf8)
     Move-Item -Force $tmp $Path
     Protect-File $Path
 }
@@ -88,7 +89,6 @@ function Invoke-SanitialXJson {
 function Get-PrimaryIPv4 {
     $address = Get-NetIPAddress -AddressFamily IPv4 -ErrorAction SilentlyContinue |
         Where-Object { $_.IPAddress -notlike '127.*' -and $_.AddressState -eq 'Preferred' } |
-        Sort-Object InterfaceMetric |
         Select-Object -First 1 -ExpandProperty IPAddress
     if ([string]::IsNullOrWhiteSpace($address)) { return '127.0.0.1' }
     return $address
@@ -96,12 +96,14 @@ function Get-PrimaryIPv4 {
 
 function Get-HeartbeatPayload {
     $cpu = Get-CimInstance Win32_Processor | Measure-Object -Property LoadPercentage -Average
+    $cpuAverage = 0
+    if ($null -ne $cpu.Average) { $cpuAverage = [double]$cpu.Average }
     $os = Get-CimInstance Win32_OperatingSystem
     $total = [double]$os.TotalVisibleMemorySize
     $free = [double]$os.FreePhysicalMemory
     $memory = if ($total -gt 0) { [Math]::Round((($total - $free) / $total) * 100, 2) } else { 0 }
     return @{
-        cpu_usage = [Math]::Round([double]($cpu.Average ?? 0), 2)
+        cpu_usage = [Math]::Round($cpuAverage, 2)
         memory_usage = $memory
         agent_version = $Script:Version
         ip_address = Get-PrimaryIPv4
@@ -138,8 +140,10 @@ function Get-InstalledSoftware {
     foreach ($path in $paths) {
         Get-ItemProperty $path -ErrorAction SilentlyContinue | ForEach-Object {
             if (-not [string]::IsNullOrWhiteSpace($_.DisplayName) -and -not [string]::IsNullOrWhiteSpace($_.DisplayVersion)) {
+                $publisher = ''
+                if ($null -ne $_.Publisher) { $publisher = [string]$_.Publisher }
                 $items.Add(@{
-                    vendor = [string]($_.Publisher ?? '')
+                    vendor = $publisher
                     product = [string]$_.DisplayName
                     package_name = [string]$_.DisplayName
                     version = [string]$_.DisplayVersion
@@ -166,6 +170,8 @@ function Add-SpoolEvent {
         [hashtable]$Metadata = @{}
     )
     Ensure-StateDirectory
+    $safeText = [string]$Text
+    if ($safeText.Length -gt 4000) { $safeText = $safeText.Substring(0,4000) }
     $event = @{
         event_id = [guid]::NewGuid().ToString()
         event_type = $Type
@@ -173,7 +179,7 @@ function Add-SpoolEvent {
         severity = $Level
         source_ip = $SourceIp
         destination_ip = Get-PrimaryIPv4
-        message = if ($Text.Length -gt 4000) { $Text.Substring(0,4000) } else { $Text }
+        message = $safeText
         metadata = @{ collector = 'sanitialx-windows-agent' }
     }
     foreach ($key in $Metadata.Keys) { $event.metadata[$key] = $Metadata[$key] }
@@ -209,14 +215,17 @@ function Collect-SecurityEvents {
     $queued = 0
     foreach ($record in $records) {
         $data = Get-EventDataMap $record
-        $ip = [string]($data['IpAddress'] ?? '')
+        $ip = ''
+        $user = ''
+        $logonType = ''
+        if ($null -ne $data['IpAddress']) { $ip = [string]$data['IpAddress'] }
+        if ($null -ne $data['TargetUserName']) { $user = [string]$data['TargetUserName'] }
+        if ($null -ne $data['LogonType']) { $logonType = [string]$data['LogonType'] }
         if ($ip -eq '-' -or $ip -eq '::1') { $ip = $null }
-        $user = [string]($data['TargetUserName'] ?? '')
-        $logonType = [string]($data['LogonType'] ?? '')
         if ($record.Id -eq 4625) {
-            Add-SpoolEvent -Type 'WINDOWS_LOGON_FAILURE' -Level 'MEDIUM' -Text $record.Message -SourceIp $ip -Metadata @{user=$user; logon_type=$logonType; event_id=4625; log_source='Security'}
+            Add-SpoolEvent -Type 'WINDOWS_LOGON_FAILURE' -Level 'MEDIUM' -Text ([string]$record.Message) -SourceIp $ip -Metadata @{user=$user; logon_type=$logonType; windows_event_id=4625; log_source='Security'}
         } else {
-            Add-SpoolEvent -Type 'WINDOWS_LOGON_SUCCESS' -Level 'INFO' -Text $record.Message -SourceIp $ip -Metadata @{user=$user; logon_type=$logonType; event_id=4624; log_source='Security'}
+            Add-SpoolEvent -Type 'WINDOWS_LOGON_SUCCESS' -Level 'INFO' -Text ([string]$record.Message) -SourceIp $ip -Metadata @{user=$user; logon_type=$logonType; windows_event_id=4624; log_source='Security'}
         }
         if ($record.RecordId -gt $maxRecord) { $maxRecord = $record.RecordId }
         $queued++
@@ -235,7 +244,7 @@ function Collect-SystemEvents {
     $queued = 0
     foreach ($record in $records) {
         $level = if ($record.Level -eq 1) { 'CRITICAL' } elseif ($record.Level -eq 2) { 'HIGH' } else { 'MEDIUM' }
-        Add-SpoolEvent -Type 'WINDOWS_SYSTEM_ALERT' -Level $level -Text $record.Message -Metadata @{provider=$record.ProviderName; windows_event_id=$record.Id; log_source='System'}
+        Add-SpoolEvent -Type 'WINDOWS_SYSTEM_ALERT' -Level $level -Text ([string]$record.Message) -Metadata @{provider=$record.ProviderName; windows_event_id=$record.Id; log_source='System'}
         if ($record.RecordId -gt $maxRecord) { $maxRecord = $record.RecordId }
         $queued++
     }
@@ -256,7 +265,11 @@ function Invoke-Flush([int]$BatchSize = 200) {
     for ($i=0; $i -lt $take; $i++) { $events += ($lines[$i] | ConvertFrom-Json) }
     Invoke-SanitialXJson -Method POST -Url "$Server/agents/$(Get-AgentId)/events" -Body @{events=$events} -Headers @{'X-Agent-Token'=(Get-AgentToken)} | Out-Null
     $remaining = if ($take -lt $lines.Count) { @($lines[$take..($lines.Count-1)]) } else { @() }
-    Write-SecureText $Script:SpoolPath ($(if ($remaining.Count) { ($remaining -join "`n") + "`n" } else { '' }))
+    if ($remaining.Count -gt 0) {
+        Write-SecureText $Script:SpoolPath (($remaining -join "`n") + "`n")
+    } else {
+        Write-SecureText $Script:SpoolPath ''
+    }
     return $take
 }
 
@@ -275,7 +288,7 @@ function Invoke-AgentRun {
             $retry = 5
             Start-Sleep -Seconds 30
         } catch {
-            Write-Error "SanitialX agent cycle failed: $($_.Exception.Message)"
+            [Console]::Error.WriteLine("SanitialX agent cycle failed: $($_.Exception.Message)")
             Start-Sleep -Seconds $retry
             $retry = [Math]::Min($retry * 2, 300)
         }
