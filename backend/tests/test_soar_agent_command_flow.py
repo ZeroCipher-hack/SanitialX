@@ -22,6 +22,10 @@ async def session():
     await engine.dispose()
 
 
+def _utc(value: datetime) -> datetime:
+    return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value.astimezone(timezone.utc)
+
+
 async def _seed_incident_and_agent(session: AsyncSession) -> tuple[IncidentORM, AgentModel]:
     incident = IncidentORM(
         incident_id="inc-soar-e2e", title="Suspicious endpoint activity", description="Integration test incident",
@@ -87,7 +91,8 @@ async def test_stale_claim_is_redelivered_after_lease_expiry(session: AsyncSessi
     reclaimed = await repo.claim_agent_command(pending[0])
     assert reclaimed.status == "CLAIMED"
     assert reclaimed.attempt_count == 2
-    assert reclaimed.lease_until > datetime.now(timezone.utc)
+    assert reclaimed.lease_until is not None
+    assert _utc(reclaimed.lease_until) > datetime.now(timezone.utc)
 
 
 @pytest.mark.asyncio
