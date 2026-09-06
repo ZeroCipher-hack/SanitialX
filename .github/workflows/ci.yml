@@ -12,6 +12,9 @@ permissions:
 jobs:
   backend:
     runs-on: ubuntu-latest
+    env:
+      SENTINELX_API_KEY: ci-test-api-key
+      SENTINELX_JWT_SECRET_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
     defaults:
       run:
         working-directory: backend
