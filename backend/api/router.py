@@ -20,6 +20,7 @@ from api.reports import router as reports_router
 from api.attack_graph import router as attack_graph_router
 from api.vulnerabilities import router as vulnerabilities_router
 from api.vulnerability_alerts import router as vulnerability_alerts_router
+from api.soar import router as soar_router
 
 api_v1_router = APIRouter(prefix="/api/v1")
 
@@ -35,3 +36,4 @@ api_v1_router.include_router(reports_router)
 api_v1_router.include_router(attack_graph_router)
 api_v1_router.include_router(vulnerabilities_router)
 api_v1_router.include_router(vulnerability_alerts_router)
+api_v1_router.include_router(soar_router)
