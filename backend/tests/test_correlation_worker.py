@@ -134,6 +134,67 @@ class TestCorrelationWorker:
         assert "Database write error" in (health["last_error"] or "")
 
     @pytest.mark.asyncio
+    async def test_event_persistence_hook_updates_metric(self) -> None:
+        events = [_make_event("msg-1", 443)]
+        subscriber = StubSubscriber(events)
+        engine = CorrelationEngine(InMemoryCorrelationStateStore())
+        service = IncidentService(StubIncidentRepository())
+
+        async def persist_hook(_event) -> bool:
+            return True
+
+        worker = CorrelationWorker(
+            subscriber=subscriber,
+            engine=engine,
+            incident_service=service,
+            event_persist_hook=persist_hook,
+        )
+        await worker.start()
+        await asyncio.sleep(0.05)
+        await worker.stop()
+
+        health = worker.get_health()
+        assert health["events_processed"] == 1
+        assert health["events_persisted"] == 1
+        assert health["event_persistence_failures"] == 0
+        assert subscriber.acked_ids == ["msg-1"]
+
+    @pytest.mark.asyncio
+    async def test_event_persistence_failure_does_not_block_ack_or_live_hook(self) -> None:
+        events = [_make_event("msg-1", 443)]
+        subscriber = StubSubscriber(events)
+        engine = CorrelationEngine(InMemoryCorrelationStateStore())
+        service = IncidentService(StubIncidentRepository())
+        live_calls = 0
+
+        async def failing_persist(_event) -> bool:
+            raise RuntimeError("event persistence failed")
+
+        async def live_hook(_event) -> int:
+            nonlocal live_calls
+            live_calls += 1
+            return 0
+
+        worker = CorrelationWorker(
+            subscriber=subscriber,
+            engine=engine,
+            incident_service=service,
+            event_persist_hook=failing_persist,
+            post_event_hook=live_hook,
+        )
+        await worker.start()
+        await asyncio.sleep(0.05)
+        await worker.stop()
+
+        health = worker.get_health()
+        assert health["events_processed"] == 1
+        assert health["events_persisted"] == 0
+        assert health["event_persistence_failures"] == 1
+        assert health["failures_count"] == 0
+        assert live_calls == 1
+        assert subscriber.acked_ids == ["msg-1"]
+
+    @pytest.mark.asyncio
     async def test_post_event_hook_creates_vulnerability_incident_metric(self) -> None:
         events = [_make_event("msg-1", 443)]
         subscriber = StubSubscriber(events)
