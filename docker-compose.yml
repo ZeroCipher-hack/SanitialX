@@ -1,5 +1,4 @@
 services:
-  # ── PostgreSQL Database ───────────────────────────────────────────────────
   postgres:
     image: postgres:16-alpine
     container_name: sentinelx-postgres
@@ -18,7 +17,6 @@ services:
       timeout: 3s
       retries: 5
 
-  # ── Redis Event Bus ───────────────────────────────────────────────────────
   redis:
     image: redis:7-alpine
     container_name: sentinelx-redis
@@ -34,7 +32,6 @@ services:
       timeout: 3s
       retries: 5
 
-  # ── One-Shot Alembic Database Migration ──────────────────────────────────
   migrate:
     build:
       context: ./backend
@@ -51,7 +48,6 @@ services:
       postgres:
         condition: service_healthy
 
-  # ── SentinelX FastAPI Backend API Server ──────────────────────────────────
   backend:
     build:
       context: ./backend
@@ -82,7 +78,6 @@ services:
       migrate:
         condition: service_completed_successfully
 
-  # ── SentinelX Background Correlation Worker ──────────────────────────────
   worker:
     build:
       context: ./backend
@@ -104,6 +99,29 @@ services:
       postgres:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
+  vulnerability-scheduler:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: sentinelx-vulnerability-scheduler
+    restart: unless-stopped
+    env_file:
+      - ./backend/.env
+    command: python scripts/run_vulnerability_scheduler.py
+    environment:
+      SENTINELX_APP_NAME: ${SENTINELX_APP_NAME:-SentinelX}
+      SENTINELX_ENVIRONMENT: ${SENTINELX_ENVIRONMENT:-production}
+      SENTINELX_LOG_LEVEL: ${SENTINELX_LOG_LEVEL:-INFO}
+      SENTINELX_DATABASE_URL: ${SENTINELX_DATABASE_URL:-postgresql+asyncpg://sentinelx:sentinelx_password_change_me@postgres:5432/sentinelx}
+      SENTINELX_API_KEY: ${SENTINELX_API_KEY:?SENTINELX_API_KEY must be set in .env}
+      SENTINELX_JWT_SECRET_KEY: ${SENTINELX_JWT_SECRET_KEY:?SENTINELX_JWT_SECRET_KEY must be set in .env}
+      SENTINELX_VULNERABILITY_SYNC_INTERVAL_SECONDS: ${SENTINELX_VULNERABILITY_SYNC_INTERVAL_SECONDS:-3600}
+    depends_on:
+      postgres:
         condition: service_healthy
       migrate:
         condition: service_completed_successfully
