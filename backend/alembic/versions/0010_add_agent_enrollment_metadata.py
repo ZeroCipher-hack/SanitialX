@@ -1,7 +1,7 @@
 """add agent enrollment metadata
 
 Revision ID: 0010_agent_enrollment
-Revises: 0009_asset_lifecycle
+Revises: 0009_add_asset_lifecycle_metadata
 Create Date: 2026-09-06
 """
 
@@ -9,7 +9,7 @@ from alembic import op
 import sqlalchemy as sa
 
 revision = "0010_agent_enrollment"
-down_revision = "0009_asset_lifecycle"
+down_revision = "0009_add_asset_lifecycle_metadata"
 branch_labels = None
 depends_on = None
 
