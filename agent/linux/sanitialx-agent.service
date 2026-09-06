@@ -1,0 +1,21 @@
+[Unit]
+Description=SanitialX Endpoint Security Agent
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+Group=root
+EnvironmentFile=-/etc/sanitialx-agent.env
+ExecStart=/usr/bin/python3 /opt/sanitialx-agent/sanitialx_agent.py --server ${SANITIALX_SERVER_URL} run
+Restart=always
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/sanitialx-agent
+
+[Install]
+WantedBy=multi-user.target
