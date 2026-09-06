@@ -1,4 +1,4 @@
-"""Deterministic CPE/product/version matching helpers for vulnerability exposure."""
+"""Deterministic package/CPE/product/version matching helpers."""
 
 from __future__ import annotations
 
@@ -44,7 +44,16 @@ def parse_cpe(criteria: str | None) -> tuple[str, str, str] | None:
     parts = criteria.split(":")
     if len(parts) < 6:
         return None
-    return parts[3].replace("\\", "").lower(), parts[4].replace("\\", "").lower(), parts[5].replace("\\", "").lower()
+    return (
+        parts[3].replace("\\", "").lower(),
+        parts[4].replace("\\", "").lower(),
+        parts[5].replace("\\", "").lower(),
+    )
+
+
+def _normalize_purl(value: str | None) -> str | None:
+    normalized = (value or "").strip().lower()
+    return normalized or None
 
 
 def match_software_to_rule(
@@ -53,12 +62,52 @@ def match_software_to_rule(
     product: str,
     version: str,
     rule: dict[str, Any],
+    cpe: str | None = None,
+    purl: str | None = None,
+    ecosystem: str | None = None,
+    package_name: str | None = None,
 ) -> tuple[bool, float, str]:
-    parsed = parse_cpe(rule.get("criteria"))
-    if parsed is None:
-        return False, 0.0, "invalid or unsupported CPE"
+    """Match one observed package to an affected-product rule.
 
-    cpe_vendor, cpe_product, cpe_version = parsed
+    Identity precedence is deliberate:
+    1. exact PURL when the vulnerability rule provides one;
+    2. observed CPE identity when available;
+    3. legacy vendor/product/version fields.
+
+    This keeps NVD CPE compatibility while allowing richer package feeds later.
+    """
+    rule_purl = _normalize_purl(rule.get("purl"))
+    software_purl = _normalize_purl(purl)
+    if rule_purl:
+        if not software_purl or software_purl != rule_purl:
+            return False, 0.0, "purl mismatch"
+        if not _in_range(version, rule):
+            return False, 0.0, "version outside affected range"
+        return True, 1.0, "software matches affected PURL/version rule"
+
+    parsed_rule = parse_cpe(rule.get("criteria"))
+    if parsed_rule is None:
+        return False, 0.0, "invalid or unsupported affected-product identity"
+
+    cpe_vendor, cpe_product, cpe_version = parsed_rule
+    observed_cpe = parse_cpe(cpe)
+    if cpe and observed_cpe is None:
+        return False, 0.0, "invalid observed CPE"
+
+    if observed_cpe is not None:
+        observed_vendor, observed_product, observed_version = observed_cpe
+        if observed_product != cpe_product:
+            return False, 0.0, "CPE product mismatch"
+        if observed_vendor != cpe_vendor:
+            return False, 0.0, "CPE vendor mismatch"
+        effective_version = version.strip().lower() or observed_version
+        if cpe_version not in {"*", "-"} and observed_version not in {"*", "-", cpe_version}:
+            return False, 0.0, "CPE version mismatch"
+        if not _in_range(effective_version, rule):
+            return False, 0.0, "version outside affected range"
+        confidence = 1.0 if cpe_version not in {"*", "-"} else 0.99
+        return True, confidence, "observed CPE matches affected CPE/version rule"
+
     vendor_norm = (vendor or "").strip().lower()
     product_norm = (product or "").strip().lower()
     version_norm = (version or "").strip().lower()
