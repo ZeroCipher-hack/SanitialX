@@ -17,7 +17,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import threading
-from typing import Any
+from typing import Any, Awaitable, Callable
 
 from correlation.engine import CorrelationEngine
 from event_bus.base import EventSubscriber
@@ -31,19 +31,20 @@ class CorrelationWorker:
     """Async background worker for event correlation and incident generation."""
 
     def __init__(
-
         self,
         subscriber: EventSubscriber,
         engine: CorrelationEngine,
         incident_service: IncidentService,
         consumer_group: str = "sentinelx-consumers",
         consumer_name: str = "correlation-worker-1",
+        post_event_hook: Callable[[Any], Awaitable[int]] | None = None,
     ) -> None:
         self._subscriber = subscriber
         self._engine = engine
         self._incident_service = incident_service
         self._consumer_group = consumer_group
         self._consumer_name = consumer_name
+        self._post_event_hook = post_event_hook
 
         self._task: asyncio.Task[None] | None = None
         self._running = False
@@ -53,6 +54,7 @@ class CorrelationWorker:
         self._events_processed = 0
         self._detections_count = 0
         self._incidents_created = 0
+        self._vulnerability_incidents_created = 0
         self._failures_count = 0
         self._last_error: str | None = None
 
@@ -69,6 +71,7 @@ class CorrelationWorker:
                 "events_processed": self._events_processed,
                 "detections_count": self._detections_count,
                 "incidents_created": self._incidents_created,
+                "vulnerability_incidents_created": self._vulnerability_incidents_created,
                 "failures_count": self._failures_count,
                 "last_error": self._last_error,
             }
@@ -119,7 +122,24 @@ class CorrelationWorker:
                         with self._lock:
                             self._incidents_created += 1
 
-                    # 3. ACK message
+                    # 3. Run optional live vulnerability correlation hook.
+                    # Hook failures are isolated from the core detection path.
+                    if self._post_event_hook is not None:
+                        try:
+                            created = await self._post_event_hook(event)
+                            if created:
+                                with self._lock:
+                                    self._vulnerability_incidents_created += int(created)
+                                    self._incidents_created += int(created)
+                        except Exception as hook_exc:
+                            logger.error(
+                                "Post-event hook failed for msg %s: %s: %s",
+                                msg_id,
+                                type(hook_exc).__name__,
+                                hook_exc,
+                            )
+
+                    # 4. ACK message
                     await self._subscriber.ack(self._consumer_group, msg_id)
 
                 except Exception as exc:
