@@ -14,9 +14,11 @@ from typing import Any
 
 from core.config import Settings, get_settings
 from correlation.engine import CorrelationEngine
+from correlation.enums import Severity
 from correlation.rules.honeypot import HoneypotDetectionRule
 from correlation.rules.port_scan import PortScanDetectionRule
 from correlation.rules.ssh_bruteforce import SSHBruteForceDetectionRule
+from correlation.sequence import DetectionSequenceRule, SequenceStage
 from correlation.state import CorrelationStateStore, InMemoryCorrelationStateStore
 from db.repositories.incident_repository import PostgresIncidentRepository
 from db.repositories.rule_repository import PostgresDetectionRuleRepository
@@ -107,6 +109,27 @@ class ApplicationContainer:
                 PortScanDetectionRule(),
                 SSHBruteForceDetectionRule(),
                 HoneypotDetectionRule(),
+            ],
+            sequence_rules=[
+                DetectionSequenceRule(
+                    rule_id="RULE-ATTACK-CHAIN-01",
+                    rule_name="Reconnaissance to SSH Attack Chain",
+                    stages=[
+                        SequenceStage(
+                            rule_id="RULE-PORT-SCAN-01",
+                            name="Network Service Scanning",
+                            mitre_technique="T1046",
+                        ),
+                        SequenceStage(
+                            rule_id="RULE-SSH-BRUTEFORCE-01",
+                            name="Brute Force",
+                            mitre_technique="T1110",
+                        ),
+                    ],
+                    window_seconds=300.0,
+                    severity=Severity.CRITICAL,
+                    title="Reconnaissance followed by SSH attack activity",
+                )
             ],
         )
 
