@@ -66,11 +66,18 @@ class LinuxAgentCollectorTests(unittest.TestCase):
     def test_non_sshd_line_is_ignored(self) -> None:
         self.assertIsNone(self.agent._classify_auth_line("kernel: ordinary system message"))
 
-    @patch("sanitialx_agent.Path.exists", return_value=True)
     @patch("sanitialx_agent.subprocess.run")
-    def test_journald_fallback_initializes_cursor_without_backfill(self, run, _exists) -> None:
+    def test_journald_fallback_initializes_cursor_without_backfill(self, run) -> None:
         run.return_value = SimpleNamespace(stdout="-- No entries --\n-- cursor: cursor-initial\n")
-        with patch.object(sanitialx_agent, "_find_auth_log", return_value=None):
+        with patch.object(sanitialx_agent, "_find_auth_log", return_value=None), patch.object(
+            sanitialx_agent.Path, "exists", autospec=True
+        ) as exists:
+            def fake_exists(path: Path) -> bool:
+                if path == Path("/run/systemd/system"):
+                    return True
+                return Path.__dict__["exists"](path)  # type: ignore[index]
+
+            exists.side_effect = fake_exists
             queued = self.agent.collect_auth_events()
 
         self.assertEqual(queued, 0)
@@ -80,9 +87,8 @@ class LinuxAgentCollectorTests(unittest.TestCase):
         self.assertIn("-n", command)
         self.assertIn("0", command)
 
-    @patch("sanitialx_agent.Path.exists", return_value=True)
     @patch("sanitialx_agent.subprocess.run")
-    def test_journald_fallback_queues_real_kali_ssh_failures(self, run, _exists) -> None:
+    def test_journald_fallback_queues_real_kali_ssh_failures(self, run) -> None:
         self.agent.ssh_journal_cursor_path.parent.mkdir(parents=True, exist_ok=True)
         self.agent.ssh_journal_cursor_path.write_text("cursor-old\n")
         records = [
@@ -97,7 +103,15 @@ class LinuxAgentCollectorTests(unittest.TestCase):
         stdout += "\n-- cursor: cursor-new\n"
         run.return_value = SimpleNamespace(stdout=stdout)
 
-        with patch.object(sanitialx_agent, "_find_auth_log", return_value=None):
+        with patch.object(sanitialx_agent, "_find_auth_log", return_value=None), patch.object(
+            sanitialx_agent.Path, "exists", autospec=True
+        ) as exists:
+            def fake_exists(path: Path) -> bool:
+                if path == Path("/run/systemd/system"):
+                    return True
+                return Path.__dict__["exists"](path)  # type: ignore[index]
+
+            exists.side_effect = fake_exists
             queued = self.agent.collect_auth_events()
 
         self.assertEqual(queued, 5)
