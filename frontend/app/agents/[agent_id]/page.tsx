@@ -1,0 +1,40 @@
+'use client';
+
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useParams } from 'next/navigation';
+import { Activity, AlertTriangle, ArrowLeft, Box, Globe2, Laptop, PackageSearch, RefreshCw, ShieldAlert } from 'lucide-react';
+import { api } from '@/lib/api';
+import type { Agent } from '@/types/api';
+
+type Exposure = { cve_id:string; status:string; risk_score:number; match_confidence:number; internet_exposed:boolean; matched_software:Record<string,unknown> };
+type AssetDetail = Agent & { software_count:number; exposure_summary:{total:number;affected:number;critical:number;high:number;max_risk_score:number}; top_exposures:Exposure[] };
+type Software = { vendor:string; product:string; version:string; package_name?:string|null; ecosystem?:string|null; purl?:string|null; cpe?:string|null; source?:string|null; last_seen?:string|null };
+type SoftwareResponse = { agent_id:string; software_count:number; software:Software[] };
+type Tab = 'overview'|'software'|'vulnerabilities'|'activity';
+
+const fmt=(value?:string|null)=>value?new Date(value).toLocaleString():'—';
+const riskClass=(score:number)=>score>=90?'critical':score>=70?'high':score>=40?'medium':'low';
+
+export default function AssetDetailPage(){
+  const params=useParams<{agent_id:string}>(); const agentId=decodeURIComponent(params.agent_id);
+  const [asset,setAsset]=useState<AssetDetail|null>(null); const [software,setSoftware]=useState<Software[]>([]); const [tab,setTab]=useState<Tab>('overview'); const [loading,setLoading]=useState(true); const [error,setError]=useState('');
+  const load=useCallback(async()=>{setLoading(true);setError('');try{const [detail,sw]=await Promise.all([api<AssetDetail>(`/agents/${encodeURIComponent(agentId)}`),api<SoftwareResponse>(`/agents/${encodeURIComponent(agentId)}/software`)]);setAsset(detail);setSoftware(sw.software);}catch(e:unknown){setError(e instanceof Error?e.message:'Asset data could not be loaded.');}finally{setLoading(false);}},[agentId]);
+  useEffect(()=>{load();},[load]);
+  const identity=useMemo(()=>asset?[['Asset type',asset.asset_type||'ENDPOINT'],['Criticality',asset.criticality||'MEDIUM'],['Environment',asset.environment||'UNKNOWN'],['Lifecycle',asset.lifecycle_status||'DISCOVERED'],['Owner',asset.owner||'Unassigned'],['Source',asset.source||'AGENT']]:[],[asset]);
+
+  if(!asset&&!loading)return <main className="page"><a href="/agents" className="ghost"><ArrowLeft size={15}/> Asset inventory</a><div className="api-warning" style={{marginTop:16}}>{error||'Asset not found.'}</div></main>;
+  return <main className="page">
+    <div className="eyebrow">ASSET INVESTIGATION</div>
+    <header className="page-header"><div><a href="/agents" className="ghost" style={{marginBottom:10}}><ArrowLeft size={15}/> Asset inventory</a><h1>{asset?.hostname||agentId}</h1><p>{asset?.ip_address||'—'} · {asset?.os||'Loading asset context…'}</p></div><button className="refresh" onClick={load} disabled={loading}><RefreshCw size={14}/> Refresh</button></header>
+    {error&&<div className="api-warning">{error}</div>}
+    {asset&&<>
+      <section className="stats"><Mini icon={<Laptop/>} label="Telemetry" value={asset.status} note={`Last seen ${fmt(asset.last_seen)}`}/><Mini icon={<ShieldAlert/>} label="Asset risk" value={`${asset.risk_score}/100`} note={`${asset.criticality||'MEDIUM'} criticality`}/><Mini icon={<PackageSearch/>} label="Software" value={String(asset.software_count)} note={`Inventory ${fmt(asset.inventory_updated_at)}`}/><Mini icon={<AlertTriangle/>} label="Exposure" value={`${asset.exposure_summary.max_risk_score}/100`} note={`${asset.exposure_summary.affected} affected · ${asset.exposure_summary.critical} critical`}/></section>
+      <div className="toolbar" style={{justifyContent:'flex-start'}}>{(['overview','software','vulnerabilities','activity'] as Tab[]).map(x=><button key={x} className={`refresh ${tab===x?'active':''}`} onClick={()=>setTab(x)}>{x.toUpperCase()}</button>)}</div>
+      {tab==='overview'&&<section className="grid-main"><div className="panel"><div className="panel-head"><div><h2>Asset identity</h2><span>SOC-owned context and lifecycle metadata</span></div></div><div style={{display:'grid',gridTemplateColumns:'repeat(2,minmax(0,1fr))',gap:10}}>{identity.map(([k,v])=><div className="rail-status-card" key={k} style={{margin:0}}><small>{k}</small><b style={{display:'block',marginTop:5}}>{v}</b></div>)}</div>{asset.tags?.length?<div style={{display:'flex',gap:6,flexWrap:'wrap',marginTop:12}}>{asset.tags.map(x=><span className="soon-badge" key={x}>{x}</span>)}</div>:null}</div><div className="panel"><div className="panel-head"><div><h2>Exposure posture</h2><span>Deterministic vulnerability correlation</span></div><Globe2 className="muted-icon"/></div><div className="risk-row"><span>Internet exposed</span><b>{asset.internet_exposed?'YES':'NO'}</b></div><div className="risk-row"><span>Total correlations</span><b>{asset.exposure_summary.total}</b></div><div className="risk-row"><span>High exposures</span><b>{asset.exposure_summary.high}</b></div><div className="risk-row"><span>Critical exposures</span><b>{asset.exposure_summary.critical}</b></div></div></section>}
+      {tab==='software'&&<div className="panel table-panel"><div className="table-meta"><span>{software.length} installed software records</span><span>SBOM-ready identifiers</span></div><div className="table-scroll"><table><thead><tr><th>Product</th><th>Version</th><th>Vendor</th><th>Ecosystem</th><th>PURL / CPE</th><th>Source</th><th>Last seen</th></tr></thead><tbody>{software.map((s,i)=><tr key={`${s.product}-${s.version}-${i}`}><td><b>{s.product}</b><small>{s.package_name||'—'}</small></td><td className="mono">{s.version}</td><td>{s.vendor||'—'}</td><td>{s.ecosystem||'—'}</td><td><small className="mono">{s.purl||s.cpe||'—'}</small></td><td>{s.source||'—'}</td><td className="mono">{fmt(s.last_seen)}</td></tr>)}{!software.length&&<tr><td colSpan={7}><div className="empty">No software inventory reported for this asset.</div></td></tr>}</tbody></table></div></div>}
+      {tab==='vulnerabilities'&&<div className="panel table-panel"><div className="table-meta"><span>{asset.top_exposures.length} priority exposure records</span><a className="ghost" href={`/vulnerabilities?asset=${encodeURIComponent(agentId)}`}>Open Vulnerability Center</a></div><div className="table-scroll"><table><thead><tr><th>CVE</th><th>Status</th><th>Risk</th><th>Confidence</th><th>Internet</th><th>Matched software</th></tr></thead><tbody>{asset.top_exposures.map(x=><tr key={x.cve_id}><td><b className="mono">{x.cve_id}</b></td><td>{x.status}</td><td><span className={`badge ${riskClass(x.risk_score)}`}>{x.risk_score}/100</span></td><td>{Math.round(x.match_confidence*100)}%</td><td>{x.internet_exposed?'YES':'NO'}</td><td><small>{String(x.matched_software?.product||x.matched_software?.package_name||'—')} {String(x.matched_software?.version||'')}</small></td></tr>)}{!asset.top_exposures.length&&<tr><td colSpan={6}><div className="empty">No vulnerability exposure correlated to this asset.</div></td></tr>}</tbody></table></div></div>}
+      {tab==='activity'&&<div className="panel"><div className="panel-head"><div><h2>Asset activity</h2><span>Telemetry snapshot from the security agent</span></div><Activity className="muted-icon"/></div><div className="risk-row"><span>Events processed</span><b>{asset.events_count}</b></div><div className="risk-row"><span>CPU usage</span><b>{asset.cpu_usage}%</b></div><div className="risk-row"><span>Memory usage</span><b>{asset.memory_usage}%</b></div><div className="risk-row"><span>First seen</span><b>{fmt(asset.first_seen)}</b></div><div className="risk-row"><span>Last seen</span><b>{fmt(asset.last_seen)}</b></div></div>}
+    </>}
+  </main>;
+}
+function Mini({icon,label,value,note}:{icon:React.ReactNode;label:string;value:string;note:string}){return <div className="stat"><div className="stat-icon">{icon}</div><div className="stat-copy"><span>{label}</span><strong style={{fontSize:22}}>{value}</strong><em>{note}</em></div></div>}
