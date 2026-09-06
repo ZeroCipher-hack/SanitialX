@@ -15,6 +15,7 @@ from typing import Any
 from core.config import Settings, get_settings
 from correlation.engine import CorrelationEngine
 from correlation.enums import Severity
+from correlation.redis_state import RedisCorrelationStateStore
 from correlation.rule_runtime import DetectionRuleRuntimeManager
 from correlation.rules.honeypot import HoneypotDetectionRule
 from correlation.rules.port_scan import PortScanDetectionRule
@@ -26,7 +27,7 @@ from db.repositories.rule_repository import PostgresDetectionRuleRepository
 from db.repositories.user_repository import PostgresUserRepository
 from db.session import DatabaseSessionManager
 from event_bus.base import EventBus
-from event_bus.redis_bus import RedisEventBus, create_redis_client
+from event_bus.redis_bus import RedisEventBus, create_redis_client, create_sync_redis_client
 from events.persistence import LiveEventPersistenceHook
 from incidents.repository import IncidentRepository
 from incidents.service import IncidentService
@@ -53,13 +54,11 @@ class ApplicationContainer:
     ) -> None:
         self.settings: Settings = settings or get_settings()
 
-        # Database
         self.db_manager: DatabaseSessionManager = (
             db_manager or DatabaseSessionManager(database_url=self.settings.DATABASE_URL)
         )
         self.db_manager.init()
 
-        # Repositories
         self.incident_repository: IncidentRepository = PostgresIncidentRepository(
             self.db_manager.sessionmaker if self.db_manager else None  # type: ignore[arg-type]
         )
@@ -69,25 +68,16 @@ class ApplicationContainer:
         self.user_repository = PostgresUserRepository(
             self.db_manager.sessionmaker if self.db_manager else None  # type: ignore[arg-type]
         )
-
-        # Incident Service
         self.incident_service = IncidentService(self.incident_repository)
 
-        # Event Bus
         self.event_bus: EventBus | None = redis_bus
-
-        # Standalone Redis client for auth concerns.
         self.redis_client: Any = create_redis_client(self.settings.REDIS_URL)
+        self.correlation_redis_client: Any | None = None
 
-        # Normalization & Pipeline
         self.normalizer_registry: NormalizerRegistry = create_default_registry()
         self.dispatcher = Dispatcher(self.normalizer_registry)
-        self.pipeline = Pipeline(
-            dispatcher=self.dispatcher,
-            publisher=self.event_bus,
-        )
+        self.pipeline = Pipeline(dispatcher=self.dispatcher, publisher=self.event_bus)
 
-        # Sensor Manager & Default Sensor
         self.sensor_manager = SensorManager()
         self.scapy_sensor = ScapySensor(
             sensor_id="scapy-sensor-1",
@@ -97,7 +87,6 @@ class ApplicationContainer:
         )
         self.sensor_manager.register(self.scapy_sensor)
 
-        # Correlation State & Engine & Default Rules
         self.correlation_state_store: CorrelationStateStore = InMemoryCorrelationStateStore()
         self.correlation_engine = CorrelationEngine(
             state_store=self.correlation_state_store,
@@ -111,16 +100,8 @@ class ApplicationContainer:
                     rule_id="RULE-ATTACK-CHAIN-01",
                     rule_name="Reconnaissance to SSH Attack Chain",
                     stages=[
-                        SequenceStage(
-                            rule_id="RULE-PORT-SCAN-01",
-                            name="Network Service Scanning",
-                            mitre_technique="T1046",
-                        ),
-                        SequenceStage(
-                            rule_id="RULE-SSH-BRUTEFORCE-01",
-                            name="Brute Force",
-                            mitre_technique="T1110",
-                        ),
+                        SequenceStage("RULE-PORT-SCAN-01", "Network Service Scanning", "T1046"),
+                        SequenceStage("RULE-SSH-BRUTEFORCE-01", "Brute Force", "T1110"),
                     ],
                     window_seconds=300.0,
                     severity=Severity.CRITICAL,
@@ -130,14 +111,9 @@ class ApplicationContainer:
         )
         self.rule_runtime_manager = DetectionRuleRuntimeManager(self.correlation_engine)
 
-        self.live_event_persistence_hook = LiveEventPersistenceHook(
-            self.db_manager.sessionmaker
-        )
-        self.live_vulnerability_hook = LiveVulnerabilityCorrelationHook(
-            self.db_manager.sessionmaker
-        )
+        self.live_event_persistence_hook = LiveEventPersistenceHook(self.db_manager.sessionmaker)
+        self.live_vulnerability_hook = LiveVulnerabilityCorrelationHook(self.db_manager.sessionmaker)
 
-        # Correlation Worker
         self.correlation_worker: CorrelationWorker | None = None
         if self.event_bus is not None:
             self.correlation_worker = CorrelationWorker(
@@ -149,14 +125,20 @@ class ApplicationContainer:
             )
 
     async def refresh_detection_rules(self) -> dict[str, int]:
-        """Load persisted detection rules and apply them to the live engine."""
         rules = await self.rule_repository.list_rules(limit=1000, offset=0)
         return self.rule_runtime_manager.apply_rules(rules)
 
     def attach_redis_bus(self, event_bus: EventBus) -> None:
-        """Attach Redis event bus after async initialization."""
+        """Attach Redis event bus and promote correlation state to Redis."""
         self.event_bus = event_bus
         self.pipeline = Pipeline(dispatcher=self.dispatcher, publisher=event_bus)
+
+        # The sync client is intentionally used only by the correlation engine,
+        # which CorrelationWorker executes in a background thread.
+        self.correlation_redis_client = create_sync_redis_client(self.settings.REDIS_URL)
+        self.correlation_state_store = RedisCorrelationStateStore(self.correlation_redis_client)
+        self.correlation_engine.set_state_store(self.correlation_state_store)
+
         self.correlation_worker = CorrelationWorker(
             subscriber=event_bus,
             engine=self.correlation_engine,

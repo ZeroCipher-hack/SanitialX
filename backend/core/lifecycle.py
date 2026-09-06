@@ -1,9 +1,7 @@
 """
 FastAPI Lifespan Manager for SentinelX.
 
-Architecture Invariant (architecture.md §15):
-- Explicit ordered startup and shutdown sequence.
-- Container attached to app.state.container.
+Architecture Invariant (architecture.md §15): explicit ordered startup/shutdown.
 """
 
 from __future__ import annotations
@@ -23,38 +21,31 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
-    """FastAPI application lifespan context manager."""
     logger.info("Initializing SentinelX application lifecycle...")
     app.state.is_ready = False
-
     settings = get_settings()
 
     container: ApplicationContainer = getattr(app.state, "container", None)
     if container is None:
         container = ApplicationContainer(settings=settings)
-
         try:
             redis_bus = RedisEventBus.from_url(settings.REDIS_URL)
             container.attach_redis_bus(redis_bus)
-            logger.info("Connected to Redis EventBus at %s", settings.REDIS_URL)
+            logger.info("Connected Redis EventBus and distributed correlation state at %s", settings.REDIS_URL)
         except Exception as exc:
             logger.warning(
-                "Could not connect to Redis at %s (%s). Proceeding without live Redis event bus.",
+                "Could not initialize Redis at %s (%s). Proceeding with in-memory correlation state.",
                 settings.REDIS_URL,
                 exc,
             )
-
         app.state.container = container
 
-    # Verify/create tables before loading persisted runtime rules.
     try:
         await container.db_manager.create_tables()
         logger.info("Verified/created database schema tables.")
     except Exception as exc:
         logger.warning("Database schema create_tables note: %s", exc)
 
-    # Load persisted, validated rule configurations into the live engine.
-    # Invalid/legacy structured data is isolated so one stale row cannot block startup.
     try:
         result = await container.refresh_detection_rules()
         logger.info(
@@ -80,7 +71,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     app.state.is_ready = True
     logger.info("SentinelX application startup complete and READY.")
-
     yield
 
     logger.info("Initiating SentinelX application shutdown sequence...")
@@ -105,6 +95,13 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             logger.info("Redis EventBus closed.")
         except Exception as exc:
             logger.error("Error closing Redis EventBus: %s", exc)
+
+    if container.correlation_redis_client is not None:
+        try:
+            container.correlation_redis_client.close()
+            logger.info("Correlation Redis client closed.")
+        except Exception as exc:
+            logger.error("Error closing correlation Redis client: %s", exc)
 
     try:
         await container.db_manager.close()
