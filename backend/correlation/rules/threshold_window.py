@@ -42,12 +42,15 @@ class ThresholdWindowRule(DetectionRule):
         metric_name: str = "event_count",
         distinct_values_name: str | None = None,
         clear_on_trigger: bool = True,
+        cooldown_seconds: float = 0.0,
     ) -> None:
         super().__init__(rule_id=rule_id, rule_name=rule_name)
         if threshold < 1:
             raise ValueError("threshold must be >= 1")
         if window_seconds <= 0:
             raise ValueError("window_seconds must be > 0")
+        if cooldown_seconds < 0:
+            raise ValueError("cooldown_seconds must be >= 0")
         if not metric_name:
             raise ValueError("metric_name must not be empty")
 
@@ -64,6 +67,7 @@ class ThresholdWindowRule(DetectionRule):
         self._metric_name = metric_name
         self._distinct_values_name = distinct_values_name
         self._clear_on_trigger = clear_on_trigger
+        self._cooldown_seconds = cooldown_seconds
 
     def evaluate(
         self,
@@ -105,6 +109,7 @@ class ThresholdWindowRule(DetectionRule):
             **self._context,
             "threshold": self._threshold,
             "window_seconds": self._window_seconds,
+            "cooldown_seconds": self._cooldown_seconds,
             "group": group_value,
             "event_count": len(events),
             self._metric_name: metric_value,
