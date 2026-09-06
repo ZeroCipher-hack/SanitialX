@@ -28,6 +28,8 @@ class TestApplicationContainer:
         assert container.sensor_manager is not None
         assert container.correlation_engine is not None
         assert container.incident_service is not None
+        assert len(container.correlation_engine.sequence_rules) == 1
+        assert container.correlation_engine.sequence_rules[0].rule_id == "RULE-ATTACK-CHAIN-01"
 
     def test_container_instances_are_isolated(self) -> None:
         """Confirming zero global mutable singletons."""
