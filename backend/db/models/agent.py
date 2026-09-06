@@ -38,8 +38,12 @@ class AgentModel(Base):
     internet_exposed: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
     tags: Mapped[list[str]] = mapped_column(JSON, default=list)
     source: Mapped[str] = mapped_column(String(40), default="agent")
+    lifecycle_status: Mapped[str] = mapped_column(String(24), default="DISCOVERED", index=True)
     first_seen: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
+    inventory_updated_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, index=True
     )
 
     def to_dict(self) -> dict[str, Any]:
@@ -61,5 +65,9 @@ class AgentModel(Base):
             "internet_exposed": self.internet_exposed,
             "tags": list(self.tags or []),
             "source": self.source,
+            "lifecycle_status": self.lifecycle_status,
             "first_seen": self.first_seen.isoformat() if self.first_seen else None,
+            "inventory_updated_at": (
+                self.inventory_updated_at.isoformat() if self.inventory_updated_at else None
+            ),
         }
