@@ -10,8 +10,6 @@ from db.repositories.incident_repository import PostgresIncidentRepository
 from db.repositories.soar_repository import PostgresSoarRepository
 
 router = APIRouter(prefix="/soar", tags=["SOAR"])
-
-SAFE_ACTIONS = {"ADD_WATCHLIST", "COLLECT_FORENSICS", "REQUEST_RESCAN", "NOTIFY_ANALYST"}
 CONTROLLED_ACTIONS = {"BLOCK_IP", "ISOLATE_HOST", "DISABLE_ACCOUNT", "KILL_PROCESS"}
 
 class SoarActionCreate(BaseModel):
@@ -26,13 +24,12 @@ class SoarActionCreate(BaseModel):
 class DecisionPayload(BaseModel):
     note: str = Field(default="", max_length=2000)
 
-
 def serialize(action) -> dict[str, Any]:
     return {"action_id":action.action_id,"incident_id":action.incident_id,"action_type":action.action_type,"target_type":action.target_type,"target_value":action.target_value,"parameters":action.parameters,"status":action.status,"risk_level":action.risk_level,"reason":action.reason,"requested_by":action.requested_by,"approved_by":action.approved_by,"rejected_by":action.rejected_by,"execution_result":action.execution_result,"created_at":action.created_at,"decided_at":action.decided_at,"executed_at":action.executed_at,"version":action.version}
 
 @router.post("/actions", status_code=status.HTTP_201_CREATED)
 async def create_action(payload:SoarActionCreate,session:Annotated[AsyncSession,Depends(get_db_session)],user:Annotated[TokenPayload,Depends(require_role(["admin","analyst"]))]):
-    incident = await PostgresIncidentRepository(session).get_incident(payload.incident_id)
+    incident = await PostgresIncidentRepository(session).get_by_id(payload.incident_id)
     if incident is None: raise HTTPException(status_code=404,detail="Incident not found.")
     action = await PostgresSoarRepository(session).create_action(payload.model_dump(), user.sub)
     return serialize(action)
@@ -69,8 +66,6 @@ async def execute_action(action_id:str,session:Annotated[AsyncSession,Depends(ge
     repo=PostgresSoarRepository(session); action=await repo.get(action_id)
     if action is None: raise HTTPException(status_code=404,detail="SOAR action not found.")
     if action.status != "APPROVED": raise HTTPException(status_code=409,detail="Action must be APPROVED before execution.")
-    # v1 executor is intentionally non-destructive. Controlled actions remain approval-gated
-    # and are recorded as simulated until connector/agent executors are explicitly added.
     simulated = action.action_type in CONTROLLED_ACTIONS
     result={"ok":True,"mode":"SIMULATED" if simulated else "SAFE_LOCAL","action_type":action.action_type,"target":action.target_value,"message":"Execution recorded; destructive endpoint control is not enabled in SOAR foundation v1." if simulated else "Safe response action recorded successfully."}
     action=await repo.mark_executed(action,actor=user.sub,result=result)
