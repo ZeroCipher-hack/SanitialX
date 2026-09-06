@@ -1,10 +1,8 @@
-"""
-CorrelationEngine — orchestrates event rules and higher-order detection sequences.
+"""CorrelationEngine — orchestrates event rules and higher-order detection sequences.
 
-NormalizedEvents are evaluated against registered DetectionRules first. Any
-resulting detections are then passed through registered DetectionSequenceRules so
-multi-stage attack chains become normal Detection objects and automatically flow
-into the existing incident pipeline.
+Primary detections are always fed into sequence correlation. Scoring and cooldown
+suppression control outward emission only, preserving evidence for attack-chain
+correlation while reducing duplicate incidents.
 """
 
 from __future__ import annotations
@@ -14,34 +12,40 @@ from typing import Sequence
 
 from correlation.models import Detection
 from correlation.rules.base import DetectionRule
+from correlation.scoring import score_detection
 from correlation.sequence import DetectionSequenceRule
 from correlation.state import CorrelationStateStore
+from correlation.suppression import DetectionSuppressor
 from events.models import NormalizedEvent
 
 logger = logging.getLogger(__name__)
 
 
 class CorrelationEngine:
-    """Orchestrates event detection rules and ordered detection sequences."""
+    """Orchestrates event rules, ordered sequences, scoring, and suppression."""
 
     def __init__(
         self,
         state_store: CorrelationStateStore,
         rules: Sequence[DetectionRule] | None = None,
         sequence_rules: Sequence[DetectionSequenceRule] | None = None,
+        suppressor: DetectionSuppressor | None = None,
     ) -> None:
         self._state_store = state_store
         self._rules: list[DetectionRule] = list(rules) if rules is not None else []
         self._sequence_rules: list[DetectionSequenceRule] = (
             list(sequence_rules) if sequence_rules is not None else []
         )
+        self._suppressor = suppressor or DetectionSuppressor()
+        self._rules_evaluated = 0
+        self._rules_matched = 0
+        self._sequence_matches = 0
+        self._errors = 0
 
     def register_rule(self, rule: DetectionRule) -> None:
-        """Register a new event-level detection rule."""
         self._rules.append(rule)
 
     def register_sequence_rule(self, rule: DetectionSequenceRule) -> None:
-        """Register a higher-order ordered detection sequence rule."""
         self._sequence_rules.append(rule)
 
     @property
@@ -52,13 +56,26 @@ class CorrelationEngine:
     def sequence_rules(self) -> list[DetectionSequenceRule]:
         return list(self._sequence_rules)
 
+    def get_metrics(self) -> dict[str, int]:
+        return {
+            "rules_evaluated": self._rules_evaluated,
+            "rules_matched": self._rules_matched,
+            "sequence_matches": self._sequence_matches,
+            "suppressed_detections": self._suppressor.suppressed_count,
+            "errors": self._errors,
+        }
+
     def process_event(self, event: NormalizedEvent) -> list[Detection]:
-        """Evaluate an event and return both primary and derived chain detections."""
-        primary_detections: list[Detection] = []
+        raw_primary: list[Detection] = []
         for rule in self._rules:
+            self._rules_evaluated += 1
             try:
-                primary_detections.extend(rule.evaluate(event, self._state_store))
+                matches = rule.evaluate(event, self._state_store)
+                if matches:
+                    self._rules_matched += len(matches)
+                    raw_primary.extend(matches)
             except Exception as exc:
+                self._errors += 1
                 logger.error(
                     "Error evaluating rule '%s' (%s) on event %s: %s",
                     rule.rule_id,
@@ -66,20 +83,26 @@ class CorrelationEngine:
                     event.event_id,
                     exc,
                 )
-                continue
 
-        derived_detections: list[Detection] = []
-        for detection in primary_detections:
+        scored_primary = [score_detection(item) for item in raw_primary]
+
+        raw_derived: list[Detection] = []
+        for detection in scored_primary:
             for sequence_rule in self._sequence_rules:
                 try:
-                    derived_detections.extend(sequence_rule.evaluate(detection))
+                    matches = sequence_rule.evaluate(detection)
+                    if matches:
+                        self._sequence_matches += len(matches)
+                        raw_derived.extend(matches)
                 except Exception as exc:
+                    self._errors += 1
                     logger.error(
                         "Error evaluating sequence rule '%s' on detection %s: %s",
                         sequence_rule.rule_id,
                         detection.detection_id,
                         exc,
                     )
-                    continue
 
-        return [*primary_detections, *derived_detections]
+        scored_derived = [score_detection(item) for item in raw_derived]
+        candidates = [*scored_primary, *scored_derived]
+        return [item for item in candidates if self._suppressor.should_emit(item)]
