@@ -11,6 +11,7 @@ from api.deps import get_current_user, get_db_session, require_role
 from core.security import TokenPayload
 from db.repositories.agent_repository import PostgresAgentRepository
 from db.repositories.vulnerability_repository import PostgresVulnerabilityRepository
+from vulnerabilities.correlation import VulnerabilityEventCorrelator
 from vulnerabilities.service import VulnerabilityService
 from vulnerabilities.sync import VulnerabilitySyncService
 
@@ -95,7 +96,6 @@ async def sync_vulnerabilities(
     hours: int = Query(default=24, ge=1, le=720),
     max_pages: int = Query(default=10, ge=1, le=100),
 ) -> dict[str, Any]:
-    """Synchronize recent NVD CVEs and enrich stored records with CISA KEV."""
     service = VulnerabilitySyncService(PostgresVulnerabilityRepository(session))
     return await service.sync_recent(hours=hours, max_pages=max_pages)
 
@@ -107,13 +107,9 @@ async def evaluate_agent_exposure(
     _user: Annotated[TokenPayload, Depends(get_current_user)],
     internet_exposed: bool = Query(default=False),
 ) -> dict[str, Any]:
-    """Evaluate one managed endpoint against the stored CVE dataset."""
     agent = await PostgresAgentRepository(session).get_agent(agent_id)
     if agent is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Agent '{agent_id}' not found.",
-        )
+        raise HTTPException(status_code=404, detail=f"Agent '{agent_id}' not found.")
 
     service = VulnerabilityService(PostgresVulnerabilityRepository(session))
     exposures = await service.evaluate_agent(
@@ -126,6 +122,44 @@ async def evaluate_agent_exposure(
         "evaluated": True,
         "affected_count": len(exposures),
         "exposures": [_exposure_to_dict(item) for item in exposures],
+    }
+
+
+@router.post("/correlate/{agent_id}")
+async def correlate_agent_exposures(
+    agent_id: str,
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+    _user: Annotated[TokenPayload, Depends(get_current_user)],
+    lookback_days: int = Query(default=30, ge=1, le=365),
+    create_incidents: bool = Query(default=True),
+) -> dict[str, Any]:
+    agent = await PostgresAgentRepository(session).get_agent(agent_id)
+    if agent is None:
+        raise HTTPException(status_code=404, detail=f"Agent '{agent_id}' not found.")
+
+    repository = PostgresVulnerabilityRepository(session)
+    exposures = await repository.list_asset_exposures(agent_id=agent_id, min_risk_score=1, limit=500)
+    correlator = VulnerabilityEventCorrelator(session)
+    results: list[dict[str, Any]] = []
+
+    for exposure in exposures:
+        vulnerability = await repository.get_vulnerability(exposure.cve_id)
+        if vulnerability is None:
+            continue
+        result = await correlator.correlate_exposure(
+            exposure=exposure,
+            vulnerability=vulnerability,
+            agent=agent,
+            lookback_days=lookback_days,
+            create_incident=create_incidents,
+        )
+        results.append(result)
+
+    return {
+        "agent_id": agent_id,
+        "correlated_exposures": len(results),
+        "incidents_created": sum(1 for item in results if item["incident_created"]),
+        "results": results,
     }
 
 
