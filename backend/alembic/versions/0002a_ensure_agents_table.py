@@ -19,6 +19,18 @@ depends_on: Union[str, Sequence[str], None] = None
 def upgrade() -> None:
     bind = op.get_bind()
     inspector = sa.inspect(bind)
+
+    # Alembic creates version_num as VARCHAR(32) by default. Some existing
+    # SanitialX revision identifiers are longer, so widen it before Alembic
+    # attempts to persist the next revision ID.
+    op.alter_column(
+        "alembic_version",
+        "version_num",
+        existing_type=sa.String(length=32),
+        type_=sa.String(length=64),
+        existing_nullable=False,
+    )
+
     if inspector.has_table("agents"):
         return
 
@@ -41,6 +53,6 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    # This migration reconciles a pre-existing domain table with Alembic.
-    # Do not drop an agents table that may have existed before this revision.
+    # Keep the widened Alembic revision column and do not drop agents because
+    # both may predate this reconciliation migration in existing installs.
     pass
