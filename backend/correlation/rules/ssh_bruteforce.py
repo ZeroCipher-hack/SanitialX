@@ -22,6 +22,7 @@ class SSHBruteForceDetectionRule(ThresholdWindowRule):
         attempt_threshold: int = 5,
         window_seconds: float = 60.0,
         severity: Severity = Severity.HIGH,
+        cooldown_seconds: float = 120.0,
     ) -> None:
         super().__init__(
             rule_id=rule_id,
@@ -40,4 +41,5 @@ class SSHBruteForceDetectionRule(ThresholdWindowRule):
             mitre_technique="T1110",
             context={"ssh_port": ssh_port, "detection_basis": "tcp_connection_frequency"},
             metric_name="attempts_count",
+            cooldown_seconds=cooldown_seconds,
         )
