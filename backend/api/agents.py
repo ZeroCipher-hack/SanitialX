@@ -74,6 +74,15 @@ async def list_agents(
     )
 
 
+@router.get("/summary")
+async def get_asset_summary(
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+    _user: Annotated[TokenPayload, Depends(get_current_user)],
+) -> dict[str, int]:
+    """Return inventory coverage counters for the SOC dashboard."""
+    return await PostgresAgentRepository(session).get_inventory_summary()
+
+
 @router.get("/{agent_id}")
 async def get_asset_detail(
     agent_id: str,
