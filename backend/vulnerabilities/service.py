@@ -9,6 +9,14 @@ from db.repositories.vulnerability_repository import PostgresVulnerabilityReposi
 from vulnerabilities.matcher import match_software_to_rule
 
 
+CRITICALITY_WEIGHTS: dict[str, int] = {
+    "LOW": 0,
+    "MEDIUM": 4,
+    "HIGH": 8,
+    "CRITICAL": 12,
+}
+
+
 class VulnerabilityService:
     def __init__(self, repository: PostgresVulnerabilityRepository) -> None:
         self._repository = repository
@@ -52,8 +60,9 @@ class VulnerabilityService:
         agent_id: str,
         asset_risk_score: int = 0,
         internet_exposed: bool = False,
+        criticality: str = "MEDIUM",
     ) -> list[AssetVulnerabilityModel]:
-        """Match an agent's inventory against stored affected CPE/version rules."""
+        """Match an asset inventory against stored affected CPE/version rules."""
         inventory = await self._repository.list_software_inventory(agent_id)
         vulnerabilities = await self._repository.list_all_vulnerabilities()
         exposures: list[AssetVulnerabilityModel] = []
@@ -84,6 +93,7 @@ class VulnerabilityService:
                 exploit_available=vuln.exploit_available,
                 internet_exposed=internet_exposed,
                 asset_risk_score=asset_risk_score,
+                criticality=criticality,
             )
             exposure = await self._repository.upsert_exposure(
                 {
@@ -117,11 +127,13 @@ class VulnerabilityService:
         exploit_available: bool,
         internet_exposed: bool,
         asset_risk_score: int = 0,
+        criticality: str = "MEDIUM",
     ) -> int:
-        """Return a 0-100 prioritization score for an affected asset.
+        """Return a deterministic 0-100 exposure prioritization score.
 
-        This is intentionally deterministic so analysts can explain why an
-        exposure was prioritized. It is not a replacement for CVSS.
+        CVSS remains vulnerability severity. This score adds exploitation evidence
+        and asset context so the SOC can prioritize the same CVE differently on a
+        disposable workstation versus a critical internet-facing production host.
         """
         score = int((cvss_score or 0.0) * 6)
         if known_exploited:
@@ -130,5 +142,7 @@ class VulnerabilityService:
             score += 10
         if internet_exposed:
             score += 10
+
+        score += CRITICALITY_WEIGHTS.get(str(criticality).upper(), CRITICALITY_WEIGHTS["MEDIUM"])
         score += min(max(asset_risk_score, 0), 100) // 10
         return min(score, 100)
