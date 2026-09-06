@@ -5,6 +5,7 @@ from db.models.event import EventModel
 from db.models.agent import AgentModel
 from db.models.honeypot import HoneypotSessionModel
 from db.models.simulation import SimulationModel
+from db.models.vulnerability import AssetSoftwareModel, VulnerabilityModel, AssetVulnerabilityModel
 
 __all__ = [
     "UserORM",
@@ -14,4 +15,7 @@ __all__ = [
     "AgentModel",
     "HoneypotSessionModel",
     "SimulationModel",
+    "AssetSoftwareModel",
+    "VulnerabilityModel",
+    "AssetVulnerabilityModel",
 ]
