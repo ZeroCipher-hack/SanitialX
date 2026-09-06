@@ -49,6 +49,17 @@ class CorrelationEngine:
     def register_rule(self, rule: DetectionRule) -> None:
         self._rules.append(rule)
 
+    def upsert_rule(self, rule: DetectionRule) -> None:
+        """Replace a runtime rule with the same ID, or append it if new."""
+        self._rules = [item for item in self._rules if item.rule_id != rule.rule_id]
+        self._rules.append(rule)
+
+    def remove_rule(self, rule_id: str) -> bool:
+        """Remove all runtime rules matching rule_id and report whether any existed."""
+        before = len(self._rules)
+        self._rules = [item for item in self._rules if item.rule_id != rule_id]
+        return len(self._rules) != before
+
     def register_sequence_rule(self, rule: DetectionSequenceRule) -> None:
         self._sequence_rules.append(rule)
 
