@@ -42,6 +42,11 @@ async def get_printable_report(incident_id:str,session:Annotated[AsyncSession,De
     """Render a self-contained A4 SOC report; browser Print -> Save as PDF produces the PDF artifact."""
     inc=await PostgresIncidentRepository(session).get_by_id(incident_id)
     if inc is None:raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,detail=f"Report for incident '{incident_id}' not found.")
-    report=_report_fields(inc,await _analyze(inc));actions=await PostgresSoarRepository(session).list(incident_id=incident_id,limit=500)
+    report=_report_fields(inc,await _analyze(inc));soar_repo=PostgresSoarRepository(session);actions=await soar_repo.list(incident_id=incident_id,limit=500)
     action_rows=[{"action_type":a.action_type,"target_value":a.target_value,"status":a.status,"approved_by":a.approved_by,"rejected_by":a.rejected_by} for a in actions]
-    return HTMLResponse(render_incident_report(report,soar_actions=action_rows),headers={"Content-Disposition":f'inline; filename="{report["report_id"]}.html"',"Cache-Control":"no-store"})
+    timeline=[{"timestamp":inc.created_at.isoformat(),"event":"INCIDENT_CREATED","actor":"SanitialX","details":inc.title},{"timestamp":inc.updated_at.isoformat(),"event":"INCIDENT_UPDATED","actor":"SanitialX","details":inc.status.value}]
+    for action in actions:
+        for audit in await soar_repo.audit(action.action_id):
+            timeline.append({"timestamp":audit.created_at.isoformat(),"event":audit.event,"actor":audit.actor,"details":audit.details})
+    timeline.sort(key=lambda item:item["timestamp"])
+    return HTMLResponse(render_incident_report(report,soar_actions=action_rows,timeline=timeline),headers={"Content-Disposition":f'inline; filename="{report["report_id"]}.html"',"Cache-Control":"no-store"})
