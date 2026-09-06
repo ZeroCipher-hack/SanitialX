@@ -38,25 +38,34 @@ export async function api<T>(endpoint: string, options: RequestInit = {}): Promi
 
 export async function openPrintableReport(incidentId: string): Promise<void> {
   if (typeof window === 'undefined') return;
-  const token = localStorage.getItem('access_token');
-  const res = await fetch(`${API_BASE}/reports/${encodeURIComponent(incidentId)}/print`, {
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
-    cache: 'no-store',
-  });
-  if (!res.ok) {
-    if (res.status === 401) localStorage.removeItem('access_token');
-    const errData = await res.json().catch(() => ({ detail: res.statusText }));
-    throw new Error(errData.detail || `Report error: ${res.status}`);
-  }
-  const html = await res.text();
-  const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const reportWindow = window.open(url, '_blank', 'noopener,noreferrer');
+  const reportWindow = window.open('about:blank', '_blank');
   if (!reportWindow) {
-    URL.revokeObjectURL(url);
     throw new Error('Browser blocked the report window. Allow pop-ups for SanitialX and try again.');
   }
-  window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  reportWindow.opener = null;
+  reportWindow.document.title = 'Generating SanitialX report…';
+  reportWindow.document.body.innerHTML = '<div style="font-family:Arial,sans-serif;padding:24px">Generating SanitialX incident report…</div>';
+
+  try {
+    const token = localStorage.getItem('access_token');
+    const res = await fetch(`${API_BASE}/reports/${encodeURIComponent(incidentId)}/print`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      cache: 'no-store',
+    });
+    if (!res.ok) {
+      if (res.status === 401) localStorage.removeItem('access_token');
+      const errData = await res.json().catch(() => ({ detail: res.statusText }));
+      throw new Error(errData.detail || `Report error: ${res.status}`);
+    }
+    const html = await res.text();
+    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    reportWindow.location.replace(url);
+    window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  } catch (error) {
+    reportWindow.close();
+    throw error;
+  }
 }
 
 export async function login(username: string, password: string): Promise<string> {
