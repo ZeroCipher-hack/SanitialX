@@ -32,6 +32,7 @@ from pipeline.dispatcher import Dispatcher
 from pipeline.pipeline import Pipeline
 from sensors.manager import SensorManager
 from sensors.scapy.sensor import ScapySensor
+from vulnerabilities.live import LiveVulnerabilityCorrelationHook
 from workers.correlation_worker import CorrelationWorker
 
 logger = logging.getLogger(__name__)
@@ -108,6 +109,10 @@ class ApplicationContainer:
             ],
         )
 
+        self.live_vulnerability_hook = LiveVulnerabilityCorrelationHook(
+            self.db_manager.sessionmaker
+        )
+
         # Correlation Worker
         self.correlation_worker: CorrelationWorker | None = None
         if self.event_bus is not None:
@@ -115,6 +120,7 @@ class ApplicationContainer:
                 subscriber=self.event_bus,
                 engine=self.correlation_engine,
                 incident_service=self.incident_service,
+                post_event_hook=self.live_vulnerability_hook,
             )
 
     def attach_redis_bus(self, event_bus: EventBus) -> None:
@@ -125,4 +131,5 @@ class ApplicationContainer:
             subscriber=event_bus,
             engine=self.correlation_engine,
             incident_service=self.incident_service,
+            post_event_hook=self.live_vulnerability_hook,
         )
