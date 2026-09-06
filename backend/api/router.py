@@ -18,6 +18,7 @@ from api.honeypots import router as honeypots_router
 from api.simulations import router as simulations_router
 from api.reports import router as reports_router
 from api.attack_graph import router as attack_graph_router
+from api.vulnerabilities import router as vulnerabilities_router
 
 api_v1_router = APIRouter(prefix="/api/v1")
 
@@ -31,3 +32,4 @@ api_v1_router.include_router(honeypots_router)
 api_v1_router.include_router(simulations_router)
 api_v1_router.include_router(reports_router)
 api_v1_router.include_router(attack_graph_router)
+api_v1_router.include_router(vulnerabilities_router)
