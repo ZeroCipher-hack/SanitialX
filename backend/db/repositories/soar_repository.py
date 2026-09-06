@@ -8,6 +8,16 @@ from db.models.soar import AgentCommandModel, SoarActionModel, SoarAuditModel
 
 COMMAND_LEASE_SECONDS = 120
 
+
+def _as_utc(value: datetime | None) -> datetime | None:
+    """Normalize DB timestamps so SQLite/PostgreSQL comparisons behave consistently."""
+    if value is None:
+        return None
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
+
+
 class PostgresSoarRepository:
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
@@ -66,7 +76,8 @@ class PostgresSoarRepository:
 
     async def claim_agent_command(self, command: AgentCommandModel) -> AgentCommandModel:
         now = datetime.now(timezone.utc)
-        stale_claim = command.status == "CLAIMED" and command.lease_until is not None and command.lease_until <= now
+        lease_until = _as_utc(command.lease_until)
+        stale_claim = command.status == "CLAIMED" and lease_until is not None and lease_until <= now
         if command.status == "QUEUED" or stale_claim:
             command.status = "CLAIMED"
             command.claimed_at = now
