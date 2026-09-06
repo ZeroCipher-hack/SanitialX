@@ -2,7 +2,7 @@
 from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any
-from sqlalchemy import JSON, DateTime, Integer, String, Text, ForeignKey
+from sqlalchemy import JSON, DateTime, Integer, String, Text, ForeignKey, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 from db.base import Base
 
@@ -38,6 +38,7 @@ class SoarAuditModel(Base):
 class AgentCommandModel(Base):
     """Approved, server-issued endpoint command. v1 only allows read-only command kinds."""
     __tablename__ = "agent_commands"
+    __table_args__ = (UniqueConstraint("action_id", name="uq_agent_commands_action_id"),)
     command_id: Mapped[str] = mapped_column(String(36), primary_key=True)
     agent_id: Mapped[str] = mapped_column(String(64), ForeignKey("agents.agent_id", ondelete="CASCADE"), index=True)
     action_id: Mapped[str] = mapped_column(String(36), ForeignKey("soar_actions.action_id", ondelete="CASCADE"), index=True)
@@ -47,4 +48,6 @@ class AgentCommandModel(Base):
     result: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
     claimed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    lease_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
+    attempt_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
