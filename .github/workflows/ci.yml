@@ -98,6 +98,29 @@ jobs:
       - name: Run Linux agent collector tests
         run: python -m unittest -v test_sanitialx_agent.py
 
+  windows-agent:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: agent/windows
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Parse PowerShell agent
+        shell: pwsh
+        run: |
+          $errors = $null
+          [void][System.Management.Automation.Language.Parser]::ParseFile(
+            (Resolve-Path './SanitialX-Agent.ps1'),
+            [ref]$null,
+            [ref]$errors
+          )
+          if ($errors.Count -gt 0) {
+            $errors | ForEach-Object { Write-Error $_.Message }
+            exit 1
+          }
+
   frontend:
     runs-on: ubuntu-latest
     defaults:
