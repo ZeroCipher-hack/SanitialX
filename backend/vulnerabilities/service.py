@@ -62,7 +62,7 @@ class VulnerabilityService:
         internet_exposed: bool = False,
         criticality: str | None = None,
     ) -> list[AssetVulnerabilityModel]:
-        """Match an asset inventory against stored affected CPE/version rules."""
+        """Match an asset inventory against stored affected-product rules."""
         inventory = await self._repository.list_software_inventory(agent_id)
         vulnerabilities = await self._repository.list_all_vulnerabilities()
         exposures: list[AssetVulnerabilityModel] = []
@@ -76,6 +76,10 @@ class VulnerabilityService:
                         vendor=software.vendor,
                         product=software.product,
                         version=software.version,
+                        cpe=software.cpe,
+                        purl=software.purl,
+                        ecosystem=software.ecosystem,
+                        package_name=software.package_name,
                         rule=rule,
                     )
                     if not matched:
