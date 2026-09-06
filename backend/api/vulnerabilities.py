@@ -2,19 +2,27 @@
 
 from __future__ import annotations
 
+import asyncio
+import logging
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.deps import get_current_user, get_db_session, require_role
+from core.config import get_settings
 from core.security import TokenPayload
 from db.repositories.agent_repository import PostgresAgentRepository
 from db.repositories.vulnerability_repository import PostgresVulnerabilityRepository
+from services.ai_vulnerability_analysis import (
+    analyze_vulnerability,
+    fallback_vulnerability_analysis,
+)
 from vulnerabilities.correlation import VulnerabilityEventCorrelator
 from vulnerabilities.service import VulnerabilityService
 from vulnerabilities.sync import VulnerabilitySyncService
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/vulnerabilities", tags=["Vulnerability Intelligence"])
 
 
@@ -161,6 +169,50 @@ async def correlate_agent_exposures(
         "incidents_created": sum(1 for item in results if item["incident_created"]),
         "results": results,
     }
+
+
+@router.post("/{cve_id}/analyze")
+async def analyze_asset_vulnerability(
+    cve_id: str,
+    agent_id: str,
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+    _user: Annotated[TokenPayload, Depends(get_current_user)],
+) -> dict[str, Any]:
+    repository = PostgresVulnerabilityRepository(session)
+    vulnerability = await repository.get_vulnerability(cve_id)
+    if vulnerability is None:
+        raise HTTPException(status_code=404, detail=f"Vulnerability '{cve_id.upper()}' not found.")
+
+    agent = await PostgresAgentRepository(session).get_agent(agent_id)
+    if agent is None:
+        raise HTTPException(status_code=404, detail=f"Agent '{agent_id}' not found.")
+
+    exposures = await repository.list_asset_exposures(agent_id=agent_id, min_risk_score=0, limit=500)
+    exposure = next((item for item in exposures if item.cve_id.upper() == cve_id.upper()), None)
+    if exposure is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No deterministic exposure exists for {agent_id} and {cve_id.upper()}.",
+        )
+
+    settings = get_settings()
+    if not settings.gemini_api_key:
+        analysis = fallback_vulnerability_analysis(vulnerability, exposure, agent)
+    else:
+        try:
+            analysis = await asyncio.to_thread(
+                analyze_vulnerability,
+                vulnerability,
+                exposure,
+                agent,
+                api_key=settings.gemini_api_key,
+                model=settings.gemini_model,
+            )
+        except Exception:
+            logger.exception("Gemini vulnerability analysis failed for %s/%s", cve_id, agent_id)
+            analysis = fallback_vulnerability_analysis(vulnerability, exposure, agent)
+
+    return analysis.model_dump()
 
 
 @router.get("/{cve_id}")
