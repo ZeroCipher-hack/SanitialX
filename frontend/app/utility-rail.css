@@ -1,0 +1,20 @@
+/* Compact right-side utility dock */
+.utility-rail{width:58px;flex:0 0 58px;min-height:calc(100vh - 52px);height:calc(100vh - 52px);position:sticky;top:52px;align-self:flex-start;border-left:1px solid var(--border);background:linear-gradient(180deg,#081019,#060b11);display:flex;flex-direction:column;align-items:center;gap:10px;padding:14px 8px;z-index:25}
+.utility-icon{position:relative;width:42px;height:42px;display:grid;place-items:center;border:1px solid #18313d;background:#0a1720;color:#77a0ad;border-radius:10px;text-decoration:none;cursor:pointer;transition:.18s;box-shadow:inset 0 1px #ffffff05}
+.utility-icon:hover,.utility-icon.active{color:var(--cyan);border-color:#247087;background:#0c222c;box-shadow:0 0 20px #35e0ff12}
+.utility-icon::before{content:attr(data-tooltip);position:absolute;right:calc(100% + 10px);top:50%;transform:translateY(-50%) translateX(5px);opacity:0;pointer-events:none;white-space:nowrap;background:#0b151d;color:#d7e8ee;border:1px solid #284651;border-radius:7px;padding:7px 9px;font-size:10px;box-shadow:0 12px 30px #000a;transition:.15s;z-index:80}
+.utility-icon::after{content:'';position:absolute;right:calc(100% + 4px);top:50%;width:7px;height:7px;background:#0b151d;border-top:1px solid #284651;border-right:1px solid #284651;transform:translateY(-50%) rotate(45deg);opacity:0;transition:.15s;z-index:81}
+.utility-icon:hover::before,.utility-icon:hover::after{opacity:1}.utility-icon:hover::before{transform:translateY(-50%) translateX(0)}
+.utility-popover-wrap{position:relative}
+.utility-popover{position:absolute;right:calc(100% + 12px);top:0;width:230px;padding:8px;background:#081119;border:1px solid #24404d;border-radius:10px;box-shadow:0 20px 60px #000c;z-index:90}
+.utility-popover-title{padding:7px 9px 9px;color:#dcebf0;font-size:11px;font-weight:600;border-bottom:1px solid #162732;margin-bottom:3px}
+.utility-popover a{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 10px;border-radius:7px;color:#8da2ac;text-decoration:none;font-size:10px;transition:.15s}
+.utility-popover a:hover{background:#0d2029;color:var(--cyan2)}.utility-popover a svg{color:#496672;flex:0 0 auto}
+
+/* The old information rail is intentionally retired in favor of icon tools. */
+.secondary-rail{display:none!important}
+.workspace-layout>.content{min-width:0;flex:1;width:auto;margin-left:0}
+
+@media(max-width:900px){.utility-rail{width:50px;flex-basis:50px;padding-left:4px;padding-right:4px}.utility-icon{width:38px;height:38px}.utility-popover{right:calc(100% + 8px)}}
+@media(max-width:700px){.utility-rail{position:fixed;right:10px;bottom:12px;top:auto;width:auto;height:auto;min-height:0;flex-direction:row;border:1px solid #1c3945;border-radius:12px;padding:6px;background:#071019e8;backdrop-filter:blur(12px);box-shadow:0 16px 45px #000b}.utility-icon::before,.utility-icon::after{display:none}.utility-popover{right:0;top:auto;bottom:calc(100% + 10px)}}
+@media print{.utility-rail{display:none!important}}

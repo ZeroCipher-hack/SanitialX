@@ -2,7 +2,11 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Shield, Activity, AlertTriangle, FileText, Sliders, LogOut, Bell, X, Play, Cpu, Layers, Zap, Radio, Share2, Crosshair, Box, Brain, CheckCircle2, Loader2, BookOpen, ScrollText, Terminal, Bot, Server, ChevronRight, CircleDot, Bug } from 'lucide-react';
+import {
+  Shield, Activity, AlertTriangle, FileText, Sliders, LogOut, Bell, X, Play, Cpu,
+  Layers, Zap, Radio, Share2, Crosshair, Box, Brain, CheckCircle2, Loader2,
+  BookOpen, ScrollText, Bug, ChevronRight,
+} from 'lucide-react';
 import { useEffect, useState, useRef } from 'react';
 import { api, logout, runAttackSimulation } from '@/lib/api';
 import type { Incident } from '@/types/api';
@@ -27,9 +31,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [incidents, setIncidents] = useState<Incident[]>([]);
   const [vulnerabilityAlerts, setVulnerabilityAlerts] = useState<VulnerabilityAlert[]>([]);
   const [showNotifs, setShowNotifs] = useState(false);
+  const [showQuickActions, setShowQuickActions] = useState(false);
   const [demoRunning, setDemoRunning] = useState(false);
   const [demoMessage, setDemoMessage] = useState('');
   const notifRef = useRef<HTMLDivElement>(null);
+  const quickActionsRef = useRef<HTMLDivElement>(null);
 
   const loadNotifications = () => {
     if (typeof window === 'undefined') return;
@@ -61,7 +67,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (notifRef.current && !notifRef.current.contains(event.target as Node)) setShowNotifs(false);
+      const target = event.target as Node;
+      if (notifRef.current && !notifRef.current.contains(target)) setShowNotifs(false);
+      if (quickActionsRef.current && !quickActionsRef.current.contains(target)) setShowQuickActions(false);
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
@@ -77,7 +85,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     } catch (e: unknown) {
       setDemoMessage(`Xatolik: ${e instanceof Error ? e.message : 'Simulyatsiya bajarilmadi'}`);
       setTimeout(() => setDemoMessage(''), 3000);
-    } finally { setDemoRunning(false); }
+    } finally {
+      setDemoRunning(false);
+    }
   };
 
   const openVulnerabilityAlert = async (alert: VulnerabilityAlert) => {
@@ -99,6 +109,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const item = (href: string, label: string, icon: React.ReactNode) => (
     <Link href={href} className={`nav-item ${pathname === href ? 'active' : ''}`}>{icon}<span>{label}</span></Link>
   );
+
+  const closeQuickActions = () => setShowQuickActions(false);
 
   return (
     <div className="app-grid">
@@ -165,7 +177,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <div className="notif-head"><span>Faol muhim ogohlantirishlar ({totalNotificationCount})</span><button onClick={() => setShowNotifs(false)}><X size={14} /></button></div>
                 <div className="notif-body">
                   {totalNotificationCount === 0 && <div className="notif-empty">Faol muhim ogohlantirishlar yo‘q.</div>}
-
                   {vulnerabilityAlerts.map((alert) => (
                     <div key={`vuln-${alert.id}`} className="notif-item" onClick={() => openVulnerabilityAlert(alert)}>
                       <span className={`badge ${alert.severity.toLowerCase()}`}>{alert.severity}</span>
@@ -173,7 +184,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                       <small>{alert.cve_id} · {alert.agent_id} · risk {alert.risk_score}/100</small>
                     </div>
                   ))}
-
                   {incidents.filter((inc) => inc.status === 'OPEN' || inc.status === 'INVESTIGATING').map((inc) => (
                     <div key={`inc-${inc.incident_id}`} className="notif-item" onClick={() => { setShowNotifs(false); router.push(`/incidents?id=${inc.incident_id}`); }}>
                       <span className={`badge ${inc.severity.toLowerCase()}`}>{inc.severity}</span>
@@ -189,51 +199,36 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <div className="workspace-layout">
           <section className="content">{children}</section>
 
-          <aside className="secondary-rail" aria-label="Tezkor ma'lumot paneli">
-            <div className="rail-header">
-              <div><span className="rail-kicker">TEZKOR NAZORAT</span><strong>Operatsion holat</strong></div>
-              <CircleDot size={15} className="rail-live" />
-            </div>
+          <aside className="utility-rail" aria-label="Tezkor vositalar">
+            <Link href="/ai-analysis" className="utility-icon" data-tooltip="AI tahlil" aria-label="AI tahlil">
+              <Brain size={20} />
+            </Link>
 
-            <div className="rail-status-card">
-              <div className="rail-card-title"><Server size={14} /> Xizmatlar</div>
-              <div className="rail-status-row"><span>Frontend</span><b className="is-ok">FAOL</b></div>
-              <div className="rail-status-row"><span>API ulanishi</span><b className="is-ok">TEKSHIRILDI</b></div>
-              <div className="rail-status-row"><span>Faol hodisalar</span><b>{activeIncidentsCount}</b></div>
-              <div className="rail-status-row"><span>CVE alertlar</span><b>{vulnerabilityAlerts.length}</b></div>
-            </div>
+            <Link href="/logs" className="utility-icon" data-tooltip="Log oqimi" aria-label="Log oqimi">
+              <ScrollText size={20} />
+            </Link>
 
-            <div className="rail-section">
-              <div className="rail-section-title"><Terminal size={14} /> Tezkor amallar</div>
-              <Link href="/logs" className="rail-link"><span>Loglarni ko‘rish</span><ChevronRight size={13} /></Link>
-              <Link href="/events" className="rail-link"><span>Hodisalarni ko‘rish</span><ChevronRight size={13} /></Link>
-              <Link href="/vulnerabilities" className="rail-link"><span>Zaifliklarni ko‘rish</span><ChevronRight size={13} /></Link>
-              <Link href="/simulations" className="rail-link"><span>Simulyatsiyalar</span><ChevronRight size={13} /></Link>
-              <Link href="/guide" className="rail-link"><span>Tizimni o‘rganish</span><ChevronRight size={13} /></Link>
-            </div>
+            <div className="utility-popover-wrap" ref={quickActionsRef}>
+              <button
+                type="button"
+                className={`utility-icon ${showQuickActions ? 'active' : ''}`}
+                data-tooltip="Tezkor amallar"
+                aria-label="Tezkor amallar"
+                aria-expanded={showQuickActions}
+                onClick={() => setShowQuickActions((value) => !value)}
+              >
+                <Zap size={20} />
+              </button>
 
-            <div className="rail-section">
-              <div className="rail-section-title"><Bot size={14} /> AI tahlil</div>
-              <div className="ai-status-box">
-                <span className="ai-status-dot" />
-                <div><b>Gemini AI</b><small>Server orqali ulangan</small></div>
-              </div>
-              <Link href="/ai-analysis" className="rail-ai-link">AI modulini ochish <ChevronRight size={13} /></Link>
-            </div>
-
-            <div className="rail-section">
-              <div className="rail-section-title"><ScrollText size={14} /> Log oqimi</div>
-              <div className="rail-log-preview">
-                <div><span>STATUS</span><b>Monitoring faol</b></div>
-                <div><span>INCIDENTS</span><b>{activeIncidentsCount} faol</b></div>
-                <div><span>CVE ALERTS</span><b>{vulnerabilityAlerts.length} yangi</b></div>
-                <div><span>REFRESH</span><b>15 soniyada</b></div>
-              </div>
-            </div>
-
-            <div className="rail-footer-note">
-              <BookOpen size={14} />
-              <span>Har bir modul nima qilishini <Link href="/guide">Qo‘llanma</Link> bo‘limidan o‘rganing.</span>
+              {showQuickActions && (
+                <div className="utility-popover">
+                  <div className="utility-popover-title">Tezkor amallar</div>
+                  <Link href="/events" onClick={closeQuickActions}><span>Hodisalarni ko‘rish</span><ChevronRight size={14} /></Link>
+                  <Link href="/vulnerabilities" onClick={closeQuickActions}><span>Zaifliklarni ko‘rish</span><ChevronRight size={14} /></Link>
+                  <Link href="/simulations" onClick={closeQuickActions}><span>Simulyatsiyalar</span><ChevronRight size={14} /></Link>
+                  <Link href="/guide" onClick={closeQuickActions}><span>Tizimni o‘rganish</span><ChevronRight size={14} /></Link>
+                </div>
+              )}
             </div>
           </aside>
         </div>
