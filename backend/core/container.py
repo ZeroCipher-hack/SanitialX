@@ -15,6 +15,7 @@ from typing import Any
 from core.config import Settings, get_settings
 from correlation.engine import CorrelationEngine
 from correlation.enums import Severity
+from correlation.rule_runtime import DetectionRuleRuntimeManager
 from correlation.rules.honeypot import HoneypotDetectionRule
 from correlation.rules.port_scan import PortScanDetectionRule
 from correlation.rules.ssh_bruteforce import SSHBruteForceDetectionRule
@@ -75,12 +76,7 @@ class ApplicationContainer:
         # Event Bus
         self.event_bus: EventBus | None = redis_bus
 
-        # Standalone Redis client for auth concerns (login rate limiting,
-        # token revocation) — kept separate from the event bus, which is
-        # attached asynchronously later via attach_redis_bus(). Created via
-        # event_bus.redis_bus.create_redis_client() rather than importing
-        # redis directly here, per the architecture invariant that
-        # event_bus/redis_bus.py is the only permitted redis import site.
+        # Standalone Redis client for auth concerns.
         self.redis_client: Any = create_redis_client(self.settings.REDIS_URL)
 
         # Normalization & Pipeline
@@ -132,6 +128,7 @@ class ApplicationContainer:
                 )
             ],
         )
+        self.rule_runtime_manager = DetectionRuleRuntimeManager(self.correlation_engine)
 
         self.live_event_persistence_hook = LiveEventPersistenceHook(
             self.db_manager.sessionmaker
@@ -150,6 +147,11 @@ class ApplicationContainer:
                 event_persist_hook=self.live_event_persistence_hook,
                 post_event_hook=self.live_vulnerability_hook,
             )
+
+    async def refresh_detection_rules(self) -> dict[str, int]:
+        """Load persisted detection rules and apply them to the live engine."""
+        rules = await self.rule_repository.list_rules(limit=1000, offset=0)
+        return self.rule_runtime_manager.apply_rules(rules)
 
     def attach_redis_bus(self, event_bus: EventBus) -> None:
         """Attach Redis event bus after async initialization."""
