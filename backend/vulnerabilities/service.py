@@ -138,12 +138,9 @@ class VulnerabilityService:
     ) -> int:
         """Return a deterministic 0-100 exposure prioritization score.
 
-        CVSS remains vulnerability severity. This score adds exploitation evidence
-        and asset context so the SOC can prioritize the same CVE differently on a
-        disposable workstation versus a critical internet-facing production host.
-
-        ``criticality=None`` is intentionally neutral for backwards compatibility;
-        callers that know asset criticality pass the stored value explicitly.
+        ``criticality=None`` is neutral for callers without asset metadata.
+        An explicit but unknown value falls back to MEDIUM so malformed or
+        forward-compatible metadata does not silently under-prioritize risk.
         """
         score = int((cvss_score or 0.0) * 6)
         if known_exploited:
@@ -154,6 +151,8 @@ class VulnerabilityService:
             score += 10
 
         if criticality is not None:
-            score += CRITICALITY_WEIGHTS.get(str(criticality).upper(), 0)
+            score += CRITICALITY_WEIGHTS.get(
+                str(criticality).upper(), CRITICALITY_WEIGHTS["MEDIUM"]
+            )
         score += min(max(asset_risk_score, 0), 100) // 10
         return min(score, 100)
