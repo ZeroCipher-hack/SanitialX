@@ -13,10 +13,16 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
-from api.deps import get_current_user, get_rule_repository, require_role
+from api.deps import (
+    get_current_user,
+    get_rule_repository,
+    get_rule_runtime_manager,
+    require_role,
+)
 from api.schemas import DetectionRuleResponse, DetectionRuleUpdate
 from core.security import TokenPayload
 from correlation.enums import Severity
+from correlation.rule_runtime import DetectionRuleRuntimeManager
 from db.repositories.rule_repository import (
     DetectionRuleVersionConflict,
     PostgresDetectionRuleRepository,
@@ -58,9 +64,10 @@ async def update_rule(
     rule_id: str,
     payload: DetectionRuleUpdate,
     repo: Annotated[PostgresDetectionRuleRepository, Depends(get_rule_repository)],
+    runtime: Annotated[DetectionRuleRuntimeManager, Depends(get_rule_runtime_manager)],
     _user: Annotated[TokenPayload, Depends(require_role(["admin", "analyst"]))],
 ) -> DetectionRuleResponse:
-    """Create or update a validated, versioned detection rule configuration."""
+    """Persist and immediately apply a validated, versioned detection rule."""
     existing = await repo.get_rule(rule_id)
     if existing is None:
         rule_name = payload.rule_name or rule_id
@@ -93,4 +100,8 @@ async def update_rule(
 
     updated = await repo.get_rule(rule_id)
     assert updated is not None
+
+    # Apply after the database commit so the persisted version remains source of truth.
+    # Legacy metadata-only rows are intentionally skipped; structured v1 rules hot-reload.
+    runtime.apply_rule(updated)
     return DetectionRuleResponse(**updated)
