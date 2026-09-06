@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.deps import get_current_user, get_db_session, require_role
+from core.agent_versions import evaluate_agent_version
 from core.config import get_settings
 from core.security import TokenPayload, generate_agent_token, hash_agent_token, verify_agent_token
 from db.repositories.agent_repository import PostgresAgentRepository
@@ -117,6 +118,15 @@ async def _require_agent(repo: PostgresAgentRepository, agent_id: str, token: st
     return model
 
 
+def _version_policy(agent: Any) -> dict[str, object]:
+    return evaluate_agent_version(
+        agent_id=agent.agent_id,
+        os_name=agent.os,
+        current_version=agent.agent_version,
+        settings=get_settings(),
+    ).to_dict()
+
+
 def _software_to_dict(item: Any) -> dict[str, Any]:
     return {"vendor":item.vendor,"product":item.product,"version":item.version,"package_name":item.package_name,"ecosystem":item.ecosystem,"purl":item.purl,"cpe":item.cpe,"source":item.source,"last_seen":item.last_seen}
 
@@ -126,14 +136,15 @@ async def enroll_agent(payload:AgentEnrollmentPayload,session:Annotated[AsyncSes
     settings=get_settings()
     if not enrollment_key or not hmac.compare_digest(enrollment_key,settings.api_key): raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,detail="Invalid enrollment key.")
     raw_token=generate_agent_token(); model=await PostgresAgentRepository(session).enroll_agent(payload.model_dump(),hash_agent_token(raw_token))
-    return {"agent_id":model.agent_id,"agent_token":raw_token,"status":model.status,"enrolled_at":model.enrolled_at.isoformat() if model.enrolled_at else None,"heartbeat_interval_seconds":30}
+    return {"agent_id":model.agent_id,"agent_token":raw_token,"status":model.status,"enrolled_at":model.enrolled_at.isoformat() if model.enrolled_at else None,"heartbeat_interval_seconds":settings.agent_heartbeat_interval_seconds,"version_policy":_version_policy(model)}
 
 
 @router.post("/{agent_id}/heartbeat")
 async def agent_heartbeat(agent_id:str,payload:AgentHeartbeatPayload,session:Annotated[AsyncSession,Depends(get_db_session)],agent_token:Annotated[str|None,Header(alias="X-Agent-Token")]=None)->dict[str,Any]:
     repo=PostgresAgentRepository(session); await _require_agent(repo,agent_id,agent_token)
     updated=await repo.heartbeat_agent(agent_id,cpu_usage=payload.cpu_usage,memory_usage=payload.memory_usage,agent_version=payload.agent_version,ip_address=payload.ip_address); assert updated is not None
-    return {"agent_id":updated.agent_id,"status":updated.status,"last_seen":updated.last_seen.isoformat(),"next_heartbeat_seconds":30}
+    settings=get_settings()
+    return {"agent_id":updated.agent_id,"status":updated.status,"last_seen":updated.last_seen.isoformat(),"next_heartbeat_seconds":settings.agent_heartbeat_interval_seconds,"version_policy":_version_policy(updated)}
 
 
 @router.put("/{agent_id}/inventory/software")
