@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.deps import get_current_user, get_db_session
 from core.security import TokenPayload
+from db.repositories.agent_repository import PostgresAgentRepository
 from db.repositories.vulnerability_repository import PostgresVulnerabilityRepository
 from vulnerabilities.service import VulnerabilityService
 
@@ -84,6 +85,35 @@ async def list_exposures(
         offset=offset,
     )
     return [_exposure_to_dict(item) for item in items]
+
+
+@router.post("/evaluate/{agent_id}")
+async def evaluate_agent_exposure(
+    agent_id: str,
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+    _user: Annotated[TokenPayload, Depends(get_current_user)],
+    internet_exposed: bool = Query(default=False),
+) -> dict[str, Any]:
+    """Evaluate one managed endpoint against the stored CVE dataset."""
+    agent = await PostgresAgentRepository(session).get_agent(agent_id)
+    if agent is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Agent '{agent_id}' not found.",
+        )
+
+    service = VulnerabilityService(PostgresVulnerabilityRepository(session))
+    exposures = await service.evaluate_agent(
+        agent_id=agent_id,
+        asset_risk_score=int(agent.get("risk_score") or 0),
+        internet_exposed=internet_exposed,
+    )
+    return {
+        "agent_id": agent_id,
+        "evaluated": True,
+        "affected_count": len(exposures),
+        "exposures": [_exposure_to_dict(item) for item in exposures],
+    }
 
 
 @router.get("/{cve_id}")
