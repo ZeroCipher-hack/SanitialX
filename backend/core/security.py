@@ -3,6 +3,7 @@ JWT Authentication & Security Utilities for SentinelX.
 
 Architecture Invariants:
 - Role-based token claims (reader, analyst, admin).
+- Endpoint agents use high-entropy opaque tokens; only SHA-256 digests are stored.
 - Never include database/redis credentials or sensitive system secrets in tokens.
 """
 
@@ -13,26 +14,17 @@ import hmac
 import secrets
 import uuid
 from datetime import datetime, timedelta, timezone
-from typing import Any
 
 import jwt
 from pydantic import BaseModel
 
 DEFAULT_EXPIRATION_MINUTES = 60
-
-# ── Password hashing (PBKDF2-HMAC-SHA256, stdlib only) ─────────────────────
-#
-# Format: "pbkdf2_sha256$<iterations>$<salt_hex>$<hash_hex>"
-# No third-party dependency (bcrypt/argon2) required; salted + iterated,
-# constant-time comparison on verify.
-
 _PBKDF2_ALGORITHM = "sha256"
 _PBKDF2_ITERATIONS = 390_000
 _PBKDF2_SALT_BYTES = 16
 
 
 def hash_password(password: str) -> str:
-    """Hash a plaintext password for storage. Never store plaintext passwords."""
     salt = secrets.token_hex(_PBKDF2_SALT_BYTES)
     derived = hashlib.pbkdf2_hmac(
         _PBKDF2_ALGORITHM, password.encode("utf-8"), bytes.fromhex(salt), _PBKDF2_ITERATIONS
@@ -41,7 +33,6 @@ def hash_password(password: str) -> str:
 
 
 def verify_password(password: str, password_hash: str) -> bool:
-    """Verify a plaintext password against a stored hash in constant time."""
     try:
         algorithm, iterations_str, salt, expected_hex = password_hash.split("$", 3)
     except ValueError:
@@ -58,6 +49,23 @@ def verify_password(password: str, password_hash: str) -> bool:
     return hmac.compare_digest(derived.hex(), expected_hex)
 
 
+def generate_agent_token() -> str:
+    """Generate a high-entropy opaque credential returned only at enrollment."""
+    return secrets.token_urlsafe(32)
+
+
+def hash_agent_token(token: str) -> str:
+    """Return a deterministic digest safe to persist instead of the raw agent token."""
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+def verify_agent_token(token: str, expected_hash: str | None) -> bool:
+    """Constant-time verification for an opaque endpoint-agent credential."""
+    if not token or not expected_hash:
+        return False
+    return hmac.compare_digest(hash_agent_token(token), expected_hash)
+
+
 class TokenPayload(BaseModel):
     sub: str
     role: str
@@ -72,7 +80,6 @@ def create_access_token(
     algorithm: str = "HS256",
     expires_delta: timedelta | None = None,
 ) -> str:
-    """Create a signed JWT access token containing subject, role, and jti claims."""
     expire = datetime.now(timezone.utc) + (
         expires_delta or timedelta(minutes=DEFAULT_EXPIRATION_MINUTES)
     )
@@ -90,9 +97,5 @@ def decode_access_token(
     secret_key: str,
     algorithm: str = "HS256",
 ) -> TokenPayload:
-    """Decode and validate a JWT access token.
-
-    Raises jwt.PyJWTError on invalid signature, expiration, or format.
-    """
     decoded = jwt.decode(token, secret_key, algorithms=[algorithm])
     return TokenPayload(**decoded)

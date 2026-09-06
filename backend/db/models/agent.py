@@ -21,16 +21,12 @@ class AgentModel(Base):
     ip_address: Mapped[str] = mapped_column(String(45), index=True)
     os: Mapped[str] = mapped_column(String(100))
     status: Mapped[str] = mapped_column(String(20), default="ONLINE", index=True)
-    last_seen: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), index=True
-    )
+    last_seen: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), index=True)
     cpu_usage: Mapped[float] = mapped_column(Float, default=0.0)
     memory_usage: Mapped[float] = mapped_column(Float, default=0.0)
     risk_score: Mapped[int] = mapped_column(Integer, default=0, index=True)
     events_count: Mapped[int] = mapped_column(Integer, default=0)
 
-    # Asset-management metadata. Agent identity remains the source of truth so
-    # vulnerability/software relations do not need a parallel asset table.
     asset_type: Mapped[str] = mapped_column(String(32), default="ENDPOINT", index=True)
     criticality: Mapped[str] = mapped_column(String(20), default="MEDIUM", index=True)
     environment: Mapped[str] = mapped_column(String(32), default="UNKNOWN", index=True)
@@ -39,12 +35,13 @@ class AgentModel(Base):
     tags: Mapped[list[str]] = mapped_column(JSON, default=list)
     source: Mapped[str] = mapped_column(String(40), default="agent")
     lifecycle_status: Mapped[str] = mapped_column(String(24), default="DISCOVERED", index=True)
-    first_seen: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
-    )
-    inventory_updated_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True, index=True
-    )
+    first_seen: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    inventory_updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
+
+    # Agent-system enrollment metadata. Raw tokens are never persisted.
+    agent_token_hash: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    enrolled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    agent_version: Mapped[str | None] = mapped_column(String(40), nullable=True)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -67,7 +64,7 @@ class AgentModel(Base):
             "source": self.source,
             "lifecycle_status": self.lifecycle_status,
             "first_seen": self.first_seen.isoformat() if self.first_seen else None,
-            "inventory_updated_at": (
-                self.inventory_updated_at.isoformat() if self.inventory_updated_at else None
-            ),
+            "inventory_updated_at": self.inventory_updated_at.isoformat() if self.inventory_updated_at else None,
+            "enrolled_at": self.enrolled_at.isoformat() if self.enrolled_at else None,
+            "agent_version": self.agent_version,
         }
