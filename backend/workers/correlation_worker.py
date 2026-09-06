@@ -5,6 +5,7 @@ Requirements:
 - Consumes NormalizedEvents from EventSubscriber.
 - Passes events to CorrelationEngine.
 - On Detection, uses build_incident_from_detection and IncidentService to create incidents.
+- Persists live normalized events through an optional idempotent hook.
 - ACKs processed messages via EventSubscriber.ack.
 - Lifecycle: start(), stop(), cancellation handling.
 - Per-event error isolation (one bad event does not kill worker loop).
@@ -17,7 +18,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import threading
-from typing import Any
+from typing import Any, Awaitable, Callable
 
 from correlation.engine import CorrelationEngine
 from event_bus.base import EventSubscriber
@@ -31,19 +32,22 @@ class CorrelationWorker:
     """Async background worker for event correlation and incident generation."""
 
     def __init__(
-
         self,
         subscriber: EventSubscriber,
         engine: CorrelationEngine,
         incident_service: IncidentService,
         consumer_group: str = "sentinelx-consumers",
         consumer_name: str = "correlation-worker-1",
+        event_persist_hook: Callable[[Any], Awaitable[bool]] | None = None,
+        post_event_hook: Callable[[Any], Awaitable[int]] | None = None,
     ) -> None:
         self._subscriber = subscriber
         self._engine = engine
         self._incident_service = incident_service
         self._consumer_group = consumer_group
         self._consumer_name = consumer_name
+        self._event_persist_hook = event_persist_hook
+        self._post_event_hook = post_event_hook
 
         self._task: asyncio.Task[None] | None = None
         self._running = False
@@ -51,8 +55,11 @@ class CorrelationWorker:
 
         # Metrics
         self._events_processed = 0
+        self._events_persisted = 0
+        self._event_persistence_failures = 0
         self._detections_count = 0
         self._incidents_created = 0
+        self._vulnerability_incidents_created = 0
         self._failures_count = 0
         self._last_error: str | None = None
 
@@ -67,8 +74,11 @@ class CorrelationWorker:
                 "running": self._running,
                 "successfully_processing": self._running and self._failures_count == 0,
                 "events_processed": self._events_processed,
+                "events_persisted": self._events_persisted,
+                "event_persistence_failures": self._event_persistence_failures,
                 "detections_count": self._detections_count,
                 "incidents_created": self._incidents_created,
+                "vulnerability_incidents_created": self._vulnerability_incidents_created,
                 "failures_count": self._failures_count,
                 "last_error": self._last_error,
             }
@@ -119,7 +129,42 @@ class CorrelationWorker:
                         with self._lock:
                             self._incidents_created += 1
 
-                    # 3. ACK message
+                    # 3. Persist live event. Persistence failures are isolated so
+                    # the event-bus consumer and detection pipeline keep moving.
+                    if self._event_persist_hook is not None:
+                        try:
+                            created = await self._event_persist_hook(event)
+                            if created:
+                                with self._lock:
+                                    self._events_persisted += 1
+                        except Exception as persist_exc:
+                            logger.error(
+                                "Event persistence hook failed for msg %s: %s: %s",
+                                msg_id,
+                                type(persist_exc).__name__,
+                                persist_exc,
+                            )
+                            with self._lock:
+                                self._event_persistence_failures += 1
+
+                    # 4. Run optional live vulnerability correlation hook.
+                    # Hook failures are isolated from the core detection path.
+                    if self._post_event_hook is not None:
+                        try:
+                            created = await self._post_event_hook(event)
+                            if created:
+                                with self._lock:
+                                    self._vulnerability_incidents_created += int(created)
+                                    self._incidents_created += int(created)
+                        except Exception as hook_exc:
+                            logger.error(
+                                "Post-event hook failed for msg %s: %s: %s",
+                                msg_id,
+                                type(hook_exc).__name__,
+                                hook_exc,
+                            )
+
+                    # 5. ACK message
                     await self._subscriber.ack(self._consumer_group, msg_id)
 
                 except Exception as exc:

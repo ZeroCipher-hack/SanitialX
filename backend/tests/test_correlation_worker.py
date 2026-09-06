@@ -12,7 +12,6 @@ from correlation.rules.port_scan import PortScanDetectionRule
 from correlation.state import InMemoryCorrelationStateStore
 from event_bus.base import EventSubscriber
 from events.models import NormalizedEvent
-from incidents.builder import build_incident_from_detection
 from incidents.enums import IncidentStatus
 from incidents.models import Incident
 from incidents.repository import IncidentRepository
@@ -70,7 +69,6 @@ def _make_event(msg_id: str, dport: int) -> tuple[str, NormalizedEvent]:
 class TestCorrelationWorker:
     @pytest.mark.asyncio
     async def test_worker_end_to_end_detection_and_incident(self) -> None:
-        # Prepare 3 distinct port scan events
         events = [
             _make_event("msg-1", 80),
             _make_event("msg-2", 443),
@@ -99,6 +97,7 @@ class TestCorrelationWorker:
         assert health["events_processed"] == 3
         assert health["detections_count"] == 1
         assert health["incidents_created"] == 1
+        assert health["vulnerability_incidents_created"] == 0
         assert len(repo.incidents) == 1
         assert repo.incidents[0].source_ip == "10.0.0.99"
         assert subscriber.acked_ids == ["msg-1", "msg-2", "msg-3"]
@@ -118,7 +117,6 @@ class TestCorrelationWorker:
 
         rule = PortScanDetectionRule(distinct_ports_threshold=1, window_seconds=60)
         engine.register_rule(rule)
-
         service = IncidentService(FailingRepo())
 
         worker = CorrelationWorker(
@@ -134,3 +132,115 @@ class TestCorrelationWorker:
         health = worker.get_health()
         assert health["failures_count"] == 1
         assert "Database write error" in (health["last_error"] or "")
+
+    @pytest.mark.asyncio
+    async def test_event_persistence_hook_updates_metric(self) -> None:
+        events = [_make_event("msg-1", 443)]
+        subscriber = StubSubscriber(events)
+        engine = CorrelationEngine(InMemoryCorrelationStateStore())
+        service = IncidentService(StubIncidentRepository())
+
+        async def persist_hook(_event) -> bool:
+            return True
+
+        worker = CorrelationWorker(
+            subscriber=subscriber,
+            engine=engine,
+            incident_service=service,
+            event_persist_hook=persist_hook,
+        )
+        await worker.start()
+        await asyncio.sleep(0.05)
+        await worker.stop()
+
+        health = worker.get_health()
+        assert health["events_processed"] == 1
+        assert health["events_persisted"] == 1
+        assert health["event_persistence_failures"] == 0
+        assert subscriber.acked_ids == ["msg-1"]
+
+    @pytest.mark.asyncio
+    async def test_event_persistence_failure_does_not_block_ack_or_live_hook(self) -> None:
+        events = [_make_event("msg-1", 443)]
+        subscriber = StubSubscriber(events)
+        engine = CorrelationEngine(InMemoryCorrelationStateStore())
+        service = IncidentService(StubIncidentRepository())
+        live_calls = 0
+
+        async def failing_persist(_event) -> bool:
+            raise RuntimeError("event persistence failed")
+
+        async def live_hook(_event) -> int:
+            nonlocal live_calls
+            live_calls += 1
+            return 0
+
+        worker = CorrelationWorker(
+            subscriber=subscriber,
+            engine=engine,
+            incident_service=service,
+            event_persist_hook=failing_persist,
+            post_event_hook=live_hook,
+        )
+        await worker.start()
+        await asyncio.sleep(0.05)
+        await worker.stop()
+
+        health = worker.get_health()
+        assert health["events_processed"] == 1
+        assert health["events_persisted"] == 0
+        assert health["event_persistence_failures"] == 1
+        assert health["failures_count"] == 0
+        assert live_calls == 1
+        assert subscriber.acked_ids == ["msg-1"]
+
+    @pytest.mark.asyncio
+    async def test_post_event_hook_creates_vulnerability_incident_metric(self) -> None:
+        events = [_make_event("msg-1", 443)]
+        subscriber = StubSubscriber(events)
+        engine = CorrelationEngine(InMemoryCorrelationStateStore())
+        service = IncidentService(StubIncidentRepository())
+
+        async def hook(_event) -> int:
+            return 1
+
+        worker = CorrelationWorker(
+            subscriber=subscriber,
+            engine=engine,
+            incident_service=service,
+            post_event_hook=hook,
+        )
+        await worker.start()
+        await asyncio.sleep(0.05)
+        await worker.stop()
+
+        health = worker.get_health()
+        assert health["events_processed"] == 1
+        assert health["vulnerability_incidents_created"] == 1
+        assert health["incidents_created"] == 1
+        assert subscriber.acked_ids == ["msg-1"]
+
+    @pytest.mark.asyncio
+    async def test_post_event_hook_failure_does_not_block_ack(self) -> None:
+        events = [_make_event("msg-1", 443)]
+        subscriber = StubSubscriber(events)
+        engine = CorrelationEngine(InMemoryCorrelationStateStore())
+        service = IncidentService(StubIncidentRepository())
+
+        async def failing_hook(_event) -> int:
+            raise RuntimeError("live correlation failed")
+
+        worker = CorrelationWorker(
+            subscriber=subscriber,
+            engine=engine,
+            incident_service=service,
+            post_event_hook=failing_hook,
+        )
+        await worker.start()
+        await asyncio.sleep(0.05)
+        await worker.stop()
+
+        health = worker.get_health()
+        assert health["events_processed"] == 1
+        assert health["failures_count"] == 0
+        assert subscriber.acked_ids == ["msg-1"]

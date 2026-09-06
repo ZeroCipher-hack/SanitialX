@@ -2,15 +2,30 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Shield, Activity, AlertTriangle, FileText, Sliders, LogOut, Bell, X, Play, Cpu, Layers, Zap, Radio, Share2, Crosshair, Box, Brain, CheckCircle2, Loader2, BookOpen, ScrollText, Terminal, Bot, Server, ChevronRight, CircleDot } from 'lucide-react';
+import { Shield, Activity, AlertTriangle, FileText, Sliders, LogOut, Bell, X, Play, Cpu, Layers, Zap, Radio, Share2, Crosshair, Box, Brain, CheckCircle2, Loader2, BookOpen, ScrollText, Terminal, Bot, Server, ChevronRight, CircleDot, Bug } from 'lucide-react';
 import { useEffect, useState, useRef } from 'react';
 import { api, logout, runAttackSimulation } from '@/lib/api';
 import type { Incident } from '@/types/api';
+
+type VulnerabilityAlert = {
+  id: number;
+  agent_id: string;
+  cve_id: string;
+  alert_type: string;
+  severity: string;
+  title: string;
+  message: string;
+  risk_score: number;
+  acknowledged: boolean;
+  created_at: string;
+  updated_at: string;
+};
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const [incidents, setIncidents] = useState<Incident[]>([]);
+  const [vulnerabilityAlerts, setVulnerabilityAlerts] = useState<VulnerabilityAlert[]>([]);
   const [showNotifs, setShowNotifs] = useState(false);
   const [demoRunning, setDemoRunning] = useState(false);
   const [demoMessage, setDemoMessage] = useState('');
@@ -19,10 +34,22 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const loadNotifications = () => {
     if (typeof window === 'undefined') return;
     const token = localStorage.getItem('access_token');
-    if (!token) { setIncidents([]); return; }
-    api<Incident[]>('/incidents?limit=50').then((data) => {
-      setIncidents(data.filter((x) => x.severity === 'CRITICAL' || x.severity === 'HIGH'));
-    }).catch(() => setIncidents([]));
+    if (!token) {
+      setIncidents([]);
+      setVulnerabilityAlerts([]);
+      return;
+    }
+
+    Promise.all([
+      api<Incident[]>('/incidents?limit=50'),
+      api<VulnerabilityAlert[]>('/vulnerability-alerts?unacknowledged_only=true&limit=50'),
+    ]).then(([incidentData, alertData]) => {
+      setIncidents(incidentData.filter((x) => x.severity === 'CRITICAL' || x.severity === 'HIGH'));
+      setVulnerabilityAlerts(alertData);
+    }).catch(() => {
+      setIncidents([]);
+      setVulnerabilityAlerts([]);
+    });
   };
 
   useEffect(() => {
@@ -53,9 +80,21 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     } finally { setDemoRunning(false); }
   };
 
+  const openVulnerabilityAlert = async (alert: VulnerabilityAlert) => {
+    try {
+      await api(`/vulnerability-alerts/${alert.id}/acknowledge`, { method: 'POST' });
+      setVulnerabilityAlerts((prev) => prev.filter((item) => item.id !== alert.id));
+    } catch {
+      // Navigation still proceeds; acknowledgement can be retried on the next refresh.
+    }
+    setShowNotifs(false);
+    router.push(`/vulnerabilities?cve=${encodeURIComponent(alert.cve_id)}&agent_id=${encodeURIComponent(alert.agent_id)}`);
+  };
+
   if (pathname === '/login') return <>{children}</>;
 
   const activeIncidentsCount = incidents.filter((x) => x.status === 'OPEN' || x.status === 'INVESTIGATING').length;
+  const totalNotificationCount = activeIncidentsCount + vulnerabilityAlerts.length;
 
   const item = (href: string, label: string, icon: React.ReactNode) => (
     <Link href={href} className={`nav-item ${pathname === href ? 'active' : ''}`}>{icon}<span>{label}</span></Link>
@@ -81,6 +120,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <div className="nav-group-title">ANIQLASH</div>
           {item('/rules', 'Aniqlash qoidalari', <Sliders size={17} />)}
           {item('/techniques', 'MITRE ATT&CK', <Layers size={17} />)}
+          {item('/vulnerabilities', 'Vulnerability Center', <Bug size={17} />)}
 
           <div className="nav-group-title">MUHIT</div>
           {item('/agents', 'Endpoint agentlar', <Cpu size={17} />)}
@@ -119,13 +159,23 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </button>
             <div className="notif-wrapper" ref={notifRef}>
               <button className="icon-btn" onClick={() => setShowNotifs(!showNotifs)} title="Bildirishnomalar">
-                <Bell size={18} />{activeIncidentsCount > 0 && <span className="badge-count">{activeIncidentsCount}</span>}
+                <Bell size={18} />{totalNotificationCount > 0 && <span className="badge-count">{totalNotificationCount}</span>}
               </button>
               {showNotifs && <div className="notif-dropdown">
-                <div className="notif-head"><span>Faol muhim ogohlantirishlar ({activeIncidentsCount})</span><button onClick={() => setShowNotifs(false)}><X size={14} /></button></div>
+                <div className="notif-head"><span>Faol muhim ogohlantirishlar ({totalNotificationCount})</span><button onClick={() => setShowNotifs(false)}><X size={14} /></button></div>
                 <div className="notif-body">
-                  {incidents.length === 0 ? <div className="notif-empty">Faol muhim ogohlantirishlar yo‘q.</div> : incidents.map((inc) => (
-                    <div key={inc.incident_id} className="notif-item" onClick={() => { setShowNotifs(false); router.push(`/incidents?id=${inc.incident_id}`); }}>
+                  {totalNotificationCount === 0 && <div className="notif-empty">Faol muhim ogohlantirishlar yo‘q.</div>}
+
+                  {vulnerabilityAlerts.map((alert) => (
+                    <div key={`vuln-${alert.id}`} className="notif-item" onClick={() => openVulnerabilityAlert(alert)}>
+                      <span className={`badge ${alert.severity.toLowerCase()}`}>{alert.severity}</span>
+                      <div className="notif-title">{alert.title}</div>
+                      <small>{alert.cve_id} · {alert.agent_id} · risk {alert.risk_score}/100</small>
+                    </div>
+                  ))}
+
+                  {incidents.filter((inc) => inc.status === 'OPEN' || inc.status === 'INVESTIGATING').map((inc) => (
+                    <div key={`inc-${inc.incident_id}`} className="notif-item" onClick={() => { setShowNotifs(false); router.push(`/incidents?id=${inc.incident_id}`); }}>
                       <span className={`badge ${inc.severity.toLowerCase()}`}>{inc.severity}</span>
                       <div className="notif-title">{inc.title}</div><small>{inc.incident_id}</small>
                     </div>
@@ -150,12 +200,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <div className="rail-status-row"><span>Frontend</span><b className="is-ok">FAOL</b></div>
               <div className="rail-status-row"><span>API ulanishi</span><b className="is-ok">TEKSHIRILDI</b></div>
               <div className="rail-status-row"><span>Faol hodisalar</span><b>{activeIncidentsCount}</b></div>
+              <div className="rail-status-row"><span>CVE alertlar</span><b>{vulnerabilityAlerts.length}</b></div>
             </div>
 
             <div className="rail-section">
               <div className="rail-section-title"><Terminal size={14} /> Tezkor amallar</div>
               <Link href="/logs" className="rail-link"><span>Loglarni ko‘rish</span><ChevronRight size={13} /></Link>
               <Link href="/events" className="rail-link"><span>Hodisalarni ko‘rish</span><ChevronRight size={13} /></Link>
+              <Link href="/vulnerabilities" className="rail-link"><span>Zaifliklarni ko‘rish</span><ChevronRight size={13} /></Link>
               <Link href="/simulations" className="rail-link"><span>Simulyatsiyalar</span><ChevronRight size={13} /></Link>
               <Link href="/guide" className="rail-link"><span>Tizimni o‘rganish</span><ChevronRight size={13} /></Link>
             </div>
@@ -173,7 +225,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <div className="rail-section-title"><ScrollText size={14} /> Log oqimi</div>
               <div className="rail-log-preview">
                 <div><span>STATUS</span><b>Monitoring faol</b></div>
-                <div><span>INCIDENTS</span><b>{incidents.length} muhim hodisa</b></div>
+                <div><span>INCIDENTS</span><b>{activeIncidentsCount} faol</b></div>
+                <div><span>CVE ALERTS</span><b>{vulnerabilityAlerts.length} yangi</b></div>
                 <div><span>REFRESH</span><b>15 soniyada</b></div>
               </div>
             </div>

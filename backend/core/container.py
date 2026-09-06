@@ -24,6 +24,7 @@ from db.repositories.user_repository import PostgresUserRepository
 from db.session import DatabaseSessionManager
 from event_bus.base import EventBus
 from event_bus.redis_bus import RedisEventBus, create_redis_client
+from events.persistence import LiveEventPersistenceHook
 from incidents.repository import IncidentRepository
 from incidents.service import IncidentService
 from normalizers.factory import create_default_registry
@@ -32,6 +33,7 @@ from pipeline.dispatcher import Dispatcher
 from pipeline.pipeline import Pipeline
 from sensors.manager import SensorManager
 from sensors.scapy.sensor import ScapySensor
+from vulnerabilities.live import LiveVulnerabilityCorrelationHook
 from workers.correlation_worker import CorrelationWorker
 
 logger = logging.getLogger(__name__)
@@ -108,6 +110,13 @@ class ApplicationContainer:
             ],
         )
 
+        self.live_event_persistence_hook = LiveEventPersistenceHook(
+            self.db_manager.sessionmaker
+        )
+        self.live_vulnerability_hook = LiveVulnerabilityCorrelationHook(
+            self.db_manager.sessionmaker
+        )
+
         # Correlation Worker
         self.correlation_worker: CorrelationWorker | None = None
         if self.event_bus is not None:
@@ -115,6 +124,8 @@ class ApplicationContainer:
                 subscriber=self.event_bus,
                 engine=self.correlation_engine,
                 incident_service=self.incident_service,
+                event_persist_hook=self.live_event_persistence_hook,
+                post_event_hook=self.live_vulnerability_hook,
             )
 
     def attach_redis_bus(self, event_bus: EventBus) -> None:
@@ -125,4 +136,6 @@ class ApplicationContainer:
             subscriber=event_bus,
             engine=self.correlation_engine,
             incident_service=self.incident_service,
+            event_persist_hook=self.live_event_persistence_hook,
+            post_event_hook=self.live_vulnerability_hook,
         )
