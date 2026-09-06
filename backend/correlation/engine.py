@@ -1,9 +1,4 @@
-"""CorrelationEngine — orchestrates event rules and higher-order detection sequences.
-
-Primary detections are always fed into sequence correlation. Scoring and cooldown
-suppression control outward emission only, preserving evidence for attack-chain
-correlation while reducing duplicate incidents.
-"""
+"""CorrelationEngine — orchestrates event rules and higher-order detection sequences."""
 
 from __future__ import annotations
 
@@ -34,9 +29,7 @@ class CorrelationEngine:
     ) -> None:
         self._state_store = state_store
         self._rules: list[DetectionRule] = list(rules) if rules is not None else []
-        self._sequence_rules: list[DetectionSequenceRule] = (
-            list(sequence_rules) if sequence_rules is not None else []
-        )
+        self._sequence_rules: list[DetectionSequenceRule] = list(sequence_rules) if sequence_rules is not None else []
         self._suppressor = suppressor or DetectionSuppressor()
         self._rules_evaluated = 0
         self._rules_matched = 0
@@ -47,8 +40,12 @@ class CorrelationEngine:
         self._processing_max_ms = 0.0
 
     def set_state_store(self, state_store: CorrelationStateStore) -> None:
-        """Swap correlation state backend without rebuilding registered rules."""
         self._state_store = state_store
+
+    @property
+    def requires_thread_offload(self) -> bool:
+        """Whether state access may block and should run outside the asyncio loop."""
+        return bool(getattr(self._state_store, "requires_thread_offload", False))
 
     def register_rule(self, rule: DetectionRule) -> None:
         self._rules.append(rule)
@@ -74,11 +71,7 @@ class CorrelationEngine:
         return list(self._sequence_rules)
 
     def get_metrics(self) -> dict[str, int | float]:
-        average_ms = (
-            self._processing_total_ms / self._events_processed
-            if self._events_processed
-            else 0.0
-        )
+        average_ms = self._processing_total_ms / self._events_processed if self._events_processed else 0.0
         return {
             "rules_evaluated": self._rules_evaluated,
             "rules_matched": self._rules_matched,
@@ -105,14 +98,10 @@ class CorrelationEngine:
                     self._errors += 1
                     logger.error(
                         "Error evaluating rule '%s' (%s) on event %s: %s",
-                        rule.rule_id,
-                        rule.rule_name,
-                        event.event_id,
-                        exc,
+                        rule.rule_id, rule.rule_name, event.event_id, exc,
                     )
 
             scored_primary = [score_detection(item) for item in raw_primary]
-
             raw_derived: list[Detection] = []
             for detection in scored_primary:
                 for sequence_rule in self._sequence_rules:
@@ -125,9 +114,7 @@ class CorrelationEngine:
                         self._errors += 1
                         logger.error(
                             "Error evaluating sequence rule '%s' on detection %s: %s",
-                            sequence_rule.rule_id,
-                            detection.detection_id,
-                            exc,
+                            sequence_rule.rule_id, detection.detection_id, exc,
                         )
 
             scored_derived = [score_detection(item) for item in raw_derived]

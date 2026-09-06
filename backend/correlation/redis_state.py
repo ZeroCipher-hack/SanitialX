@@ -1,9 +1,4 @@
-"""Redis-backed correlation state store.
-
-The store receives a synchronous Redis-compatible client via dependency injection.
-CorrelationWorker runs the synchronous engine inside ``asyncio.to_thread`` so Redis
-I/O never blocks the application's event loop.
-"""
+"""Redis-backed correlation state store."""
 
 from __future__ import annotations
 
@@ -16,6 +11,8 @@ from events.models import NormalizedEvent
 
 class RedisCorrelationStateStore(CorrelationStateStore):
     """Distributed sliding-window state shared across correlation workers."""
+
+    requires_thread_offload = True
 
     def __init__(self, redis_client: Any, namespace: str = "sentinelx:corr") -> None:
         self._redis = redis_client
@@ -34,8 +31,6 @@ class RedisCorrelationStateStore(CorrelationStateStore):
         events_key, payloads_key, dedupe_set_key = self._keys(key)
         dedupe_key = self._dedupe_key(key, event.event_id)
 
-        # WATCH/MULTI keeps dedupe + event persistence atomic without Lua and is
-        # compatible with standard Redis transaction semantics.
         while True:
             pipe = self._redis.pipeline()
             try:
@@ -43,7 +38,6 @@ class RedisCorrelationStateStore(CorrelationStateStore):
                 if pipe.exists(dedupe_key):
                     pipe.unwatch()
                     return False
-
                 pipe.multi()
                 pipe.set(dedupe_key, "1", px=ttl_ms)
                 pipe.zadd(events_key, {event.event_id: event.timestamp.timestamp()})
@@ -72,12 +66,8 @@ class RedisCorrelationStateStore(CorrelationStateStore):
         event_ids = self._redis.zrangebyscore(events_key, cutoff, "+inf") or []
         if not event_ids:
             return []
-
         payloads = self._redis.hmget(payloads_key, event_ids)
-        events: list[NormalizedEvent] = []
-        for payload in payloads:
-            if payload:
-                events.append(NormalizedEvent.model_validate_json(payload))
+        events = [NormalizedEvent.model_validate_json(payload) for payload in payloads if payload]
         events.sort(key=lambda item: item.timestamp)
         return events
 

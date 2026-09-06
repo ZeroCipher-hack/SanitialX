@@ -88,6 +88,11 @@ class CorrelationWorker:
             self._task = None
         logger.info("CorrelationWorker stopped.")
 
+    async def _process_event(self, event: Any):
+        if self._engine.requires_thread_offload:
+            return await asyncio.to_thread(self._engine.process_event, event)
+        return self._engine.process_event(event)
+
     async def _run_loop(self) -> None:
         try:
             async for msg_id, event in self._subscriber.consume(
@@ -97,9 +102,7 @@ class CorrelationWorker:
                 if not self._running:
                     break
                 try:
-                    # Correlation may perform synchronous Redis I/O. Run the engine
-                    # in a worker thread so the asyncio consumer loop stays responsive.
-                    detections = await asyncio.to_thread(self._engine.process_event, event)
+                    detections = await self._process_event(event)
 
                     with self._lock:
                         self._events_processed += 1
@@ -120,9 +123,7 @@ class CorrelationWorker:
                         except Exception as persist_exc:
                             logger.error(
                                 "Event persistence hook failed for msg %s: %s: %s",
-                                msg_id,
-                                type(persist_exc).__name__,
-                                persist_exc,
+                                msg_id, type(persist_exc).__name__, persist_exc,
                             )
                             with self._lock:
                                 self._event_persistence_failures += 1
@@ -137,9 +138,7 @@ class CorrelationWorker:
                         except Exception as hook_exc:
                             logger.error(
                                 "Post-event hook failed for msg %s: %s: %s",
-                                msg_id,
-                                type(hook_exc).__name__,
-                                hook_exc,
+                                msg_id, type(hook_exc).__name__, hook_exc,
                             )
 
                     await self._subscriber.ack(self._consumer_group, msg_id)
