@@ -39,4 +39,5 @@ class SSHBruteForceDetectionRule(ThresholdWindowRule):
             ),
             mitre_technique="T1110",
             context={"ssh_port": ssh_port, "detection_basis": "tcp_connection_frequency"},
+            metric_name="attempts_count",
         )
