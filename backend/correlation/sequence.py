@@ -33,17 +33,21 @@ class DetectionSequenceRule:
         window_seconds: float,
         severity: Severity = Severity.CRITICAL,
         title: str = "Multi-stage attack chain detected",
+        cooldown_seconds: float = 300.0,
     ) -> None:
         if len(stages) < 2:
             raise ValueError("sequence requires at least two stages")
         if window_seconds <= 0:
             raise ValueError("window_seconds must be > 0")
+        if cooldown_seconds < 0:
+            raise ValueError("cooldown_seconds must be >= 0")
         self.rule_id = rule_id
         self.rule_name = rule_name
         self.stages = tuple(stages)
         self.window_seconds = window_seconds
         self.severity = severity
         self.title = title
+        self.cooldown_seconds = cooldown_seconds
         self._progress: dict[str, list[Detection]] = {}
 
     def evaluate(self, detection: Detection) -> list[Detection]:
@@ -98,6 +102,7 @@ class DetectionSequenceRule:
             context={
                 "correlation_type": "ordered_sequence",
                 "window_seconds": self.window_seconds,
+                "cooldown_seconds": self.cooldown_seconds,
                 "stages": [stage.name for stage in self.stages],
                 "stage_rule_ids": [stage.rule_id for stage in self.stages],
                 "mitre_techniques": techniques,
