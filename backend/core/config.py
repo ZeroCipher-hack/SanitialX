@@ -51,6 +51,10 @@ class Settings(BaseSettings):
     agent_heartbeat_interval_seconds: int = Field(default=30, ge=5, le=3600)
     agent_offline_timeout_seconds: int = Field(default=120, ge=15, le=86400)
     agent_offline_check_interval_seconds: int = Field(default=30, ge=5, le=3600)
+    agent_linux_minimum_version: str = Field(default="0.2.0")
+    agent_linux_latest_version: str = Field(default="0.2.0")
+    agent_windows_minimum_version: str = Field(default="0.1.0")
+    agent_windows_latest_version: str = Field(default="0.1.0")
 
     gemini_api_key: str | None = Field(default=None, description="Google Gemini API key; keep server-side only")
     gemini_model: str = Field(default="gemini-3.6-flash", description="Gemini model used for incident analysis")
