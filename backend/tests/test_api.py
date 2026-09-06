@@ -17,9 +17,6 @@ from main import app
 
 @pytest.fixture
 async def client():
-    # Use SQLite in-memory for testing API endpoints against database and
-    # fakeredis for Redis-backed authentication concerns. Tests must not
-    # depend on a host Redis daemon or a published Docker port.
     settings = Settings(
         ENVIRONMENT="testing",
         DATABASE_URL="sqlite+aiosqlite:///:memory:",
@@ -74,8 +71,7 @@ class TestHealthAPI:
         headers = _get_auth_headers("reader")
         response = await client.get("/api/v1/health/ready", headers=headers)
         assert response.status_code == 200
-        data = response.json()
-        assert data["status"] == "ready"
+        assert response.json()["status"] == "ready"
 
 
 class TestIncidentsAPI:
@@ -104,7 +100,6 @@ class TestIncidentsAPI:
     @pytest.mark.asyncio
     async def test_patch_incident_status_success_analyst_role(self, client: TestClient) -> None:
         container: ApplicationContainer = app.state.container
-
         from correlation.enums import Severity
         from incidents.enums import IncidentStatus
         from incidents.models import Incident
@@ -128,16 +123,14 @@ class TestIncidentsAPI:
             headers=headers,
         )
         assert res1.status_code == 200
-        data = res1.json()
-        assert data["status"] == "INVESTIGATING"
-        assert data["version"] == 2
+        assert res1.json()["status"] == "INVESTIGATING"
+        assert res1.json()["version"] == 2
 
 
 class TestRulesAPI:
     @pytest.mark.asyncio
     async def test_put_and_get_rule(self, client: TestClient) -> None:
         headers = _get_auth_headers("admin")
-
         payload = {
             "rule_name": "Custom PortScan",
             "severity": "CRITICAL",
@@ -159,7 +152,6 @@ class TestRulesAPI:
                 },
             },
         }
-
         put_res = await client.put("/api/v1/rules/R-TEST-1", json=payload, headers=headers)
         assert put_res.status_code == 200
         data = put_res.json()
@@ -187,3 +179,80 @@ class TestRulesAPI:
             headers=headers,
         )
         assert stale_res.status_code == 409
+
+
+class TestAssetsAPI:
+    async def _seed_asset(self) -> None:
+        container: ApplicationContainer = app.state.container
+        async with container.db_manager.sessionmaker() as session:
+            from db.repositories.agent_repository import PostgresAgentRepository
+
+            await PostgresAgentRepository(session).upsert_agent(
+                {
+                    "agent_id": "asset-1",
+                    "hostname": "prod-web-01",
+                    "ip_address": "10.0.0.10",
+                    "os": "Ubuntu 24.04",
+                    "status": "ONLINE",
+                    "risk_score": 72,
+                }
+            )
+
+    @pytest.mark.asyncio
+    async def test_asset_metadata_update_and_filters(self, client: TestClient) -> None:
+        await self._seed_asset()
+        headers = _get_auth_headers("analyst")
+
+        patch = await client.patch(
+            "/api/v1/agents/asset-1",
+            json={
+                "asset_type": "SERVER",
+                "criticality": "CRITICAL",
+                "environment": "PRODUCTION",
+                "owner": "Platform Team",
+                "internet_exposed": True,
+                "tags": [" Web ", "Production", "web"],
+            },
+            headers=headers,
+        )
+        assert patch.status_code == 200
+        data = patch.json()
+        assert data["asset_type"] == "SERVER"
+        assert data["criticality"] == "CRITICAL"
+        assert data["internet_exposed"] is True
+        assert data["tags"] == ["web", "production"]
+
+        listing = await client.get(
+            "/api/v1/agents?asset_type=SERVER&criticality=CRITICAL&internet_exposed=true&q=prod-web",
+            headers=headers,
+        )
+        assert listing.status_code == 200
+        assert len(listing.json()) == 1
+        assert listing.json()[0]["agent_id"] == "asset-1"
+
+    @pytest.mark.asyncio
+    async def test_asset_detail_includes_exposure_summary(self, client: TestClient) -> None:
+        await self._seed_asset()
+        headers = _get_auth_headers("reader")
+        detail = await client.get("/api/v1/agents/asset-1", headers=headers)
+        assert detail.status_code == 200
+        data = detail.json()
+        assert data["hostname"] == "prod-web-01"
+        assert data["software_count"] == 0
+        assert data["exposure_summary"] == {
+            "total": 0,
+            "affected": 0,
+            "critical": 0,
+            "high": 0,
+            "max_risk_score": 0,
+        }
+
+    @pytest.mark.asyncio
+    async def test_reader_cannot_change_asset_metadata(self, client: TestClient) -> None:
+        await self._seed_asset()
+        response = await client.patch(
+            "/api/v1/agents/asset-1",
+            json={"criticality": "HIGH"},
+            headers=_get_auth_headers("reader"),
+        )
+        assert response.status_code == 403
