@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from typing import Any
-from sqlalchemy import desc, or_, select
+from sqlalchemy import desc, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from db.models.agent import AgentModel
@@ -65,6 +65,33 @@ class PostgresAgentRepository:
         stmt = stmt.order_by(desc(AgentModel.risk_score), AgentModel.hostname).limit(limit).offset(offset)
         result = await self._session.execute(stmt)
         return [row.to_dict() for row in result.scalars().all()]
+
+    async def get_inventory_summary(self) -> dict[str, int]:
+        """Return aggregate SOC asset coverage counters using DB-side counts."""
+        total = await self._session.scalar(select(func.count()).select_from(AgentModel))
+        critical = await self._session.scalar(
+            select(func.count()).select_from(AgentModel).where(AgentModel.criticality == "CRITICAL")
+        )
+        internet_facing = await self._session.scalar(
+            select(func.count()).select_from(AgentModel).where(AgentModel.internet_exposed.is_(True))
+        )
+        offline = await self._session.scalar(
+            select(func.count()).select_from(AgentModel).where(AgentModel.status == "OFFLINE")
+        )
+        high_risk = await self._session.scalar(
+            select(func.count()).select_from(AgentModel).where(AgentModel.risk_score >= 70)
+        )
+        production = await self._session.scalar(
+            select(func.count()).select_from(AgentModel).where(AgentModel.environment == "PRODUCTION")
+        )
+        return {
+            "total_assets": int(total or 0),
+            "critical_assets": int(critical or 0),
+            "internet_facing_assets": int(internet_facing or 0),
+            "offline_assets": int(offline or 0),
+            "high_risk_assets": int(high_risk or 0),
+            "production_assets": int(production or 0),
+        }
 
     async def get_agent(self, agent_id: str) -> dict[str, Any] | None:
         model = await self._session.get(AgentModel, agent_id)
