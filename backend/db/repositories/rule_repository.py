@@ -14,6 +14,10 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from db.models.rule import DetectionRuleORM
 
 
+class DetectionRuleVersionConflict(RuntimeError):
+    """Raised when a stale detection-rule update attempts to overwrite newer data."""
+
+
 class PostgresDetectionRuleRepository:
     """Repository for persistent detection rule metadata and configuration."""
 
@@ -36,13 +40,19 @@ class PostgresDetectionRuleRepository:
         description: str | None = None,
         enabled: bool = True,
         parameters: dict[str, Any] | None = None,
-    ) -> None:
+        expected_version: int | None = None,
+    ) -> int:
         async with self._get_session() as session:
             stmt = select(DetectionRuleORM).where(DetectionRuleORM.rule_id == rule_id)
             existing = (await session.execute(stmt)).scalar_one_or_none()
             now = datetime.now(timezone.utc)
 
             if existing is None:
+                if expected_version not in (None, 0):
+                    raise DetectionRuleVersionConflict(
+                        f"Detection rule '{rule_id}' does not exist at version {expected_version}."
+                    )
+                version = 1
                 session.add(
                     DetectionRuleORM(
                         rule_id=rule_id,
@@ -51,20 +61,30 @@ class PostgresDetectionRuleRepository:
                         severity=severity,
                         enabled=enabled,
                         parameters=parameters or {},
+                        version=version,
                         created_at=now,
                         updated_at=now,
                     )
                 )
             else:
+                current_version = int(existing.version or 1)
+                if expected_version is not None and expected_version != current_version:
+                    raise DetectionRuleVersionConflict(
+                        f"Detection rule '{rule_id}' is version {current_version}, "
+                        f"not expected version {expected_version}."
+                    )
+                version = current_version + 1
                 existing.rule_name = rule_name
                 existing.severity = severity
                 existing.description = description
                 existing.enabled = enabled
                 if parameters is not None:
                     existing.parameters = parameters
+                existing.version = version
                 existing.updated_at = now
 
             await session.commit()
+            return version
 
     async def get_rule(self, rule_id: str) -> dict[str, Any] | None:
         async with self._get_session() as session:
@@ -92,6 +112,7 @@ class PostgresDetectionRuleRepository:
             "severity": orm.severity,
             "enabled": orm.enabled,
             "parameters": orm.parameters or {},
+            "version": int(orm.version or 1),
             "created_at": orm.created_at,
             "updated_at": orm.updated_at,
         }
