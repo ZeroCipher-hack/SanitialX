@@ -2,19 +2,72 @@
 
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime
+from email.utils import parsedate_to_datetime
 from typing import Any
 
 import httpx
 
 NVD_CVE_API_URL = "https://services.nvd.nist.gov/rest/json/cves/2.0"
 CISA_KEV_JSON_URL = "https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json"
+_RETRYABLE_STATUS = {429, 500, 502, 503, 504}
 
 
 def _parse_datetime(value: str | None) -> datetime | None:
     if not value:
         return None
     return datetime.fromisoformat(value.replace("Z", "+00:00"))
+
+
+def _retry_delay(response: httpx.Response | None, attempt: int, base_delay: float) -> float:
+    if response is not None:
+        retry_after = response.headers.get("Retry-After")
+        if retry_after:
+            try:
+                return max(0.0, float(retry_after))
+            except ValueError:
+                try:
+                    retry_at = parsedate_to_datetime(retry_after)
+                    now = datetime.now(retry_at.tzinfo)
+                    return max(0.0, (retry_at - now).total_seconds())
+                except (TypeError, ValueError, OverflowError):
+                    pass
+    return min(base_delay * (2 ** attempt), 60.0)
+
+
+async def _get_json_with_retry(
+    url: str,
+    *,
+    timeout: float,
+    params: dict[str, Any] | None = None,
+    headers: dict[str, str] | None = None,
+    max_retries: int = 4,
+    base_delay: float = 1.0,
+) -> dict[str, Any]:
+    last_error: Exception | None = None
+    async with httpx.AsyncClient(timeout=timeout) as client:
+        for attempt in range(max_retries + 1):
+            response: httpx.Response | None = None
+            try:
+                response = await client.get(url, params=params, headers=headers)
+                if response.status_code not in _RETRYABLE_STATUS:
+                    response.raise_for_status()
+                    return response.json()
+                last_error = httpx.HTTPStatusError(
+                    f"retryable HTTP {response.status_code}",
+                    request=response.request,
+                    response=response,
+                )
+            except (httpx.TimeoutException, httpx.NetworkError) as exc:
+                last_error = exc
+
+            if attempt >= max_retries:
+                break
+            await asyncio.sleep(_retry_delay(response, attempt, base_delay))
+
+    assert last_error is not None
+    raise last_error
 
 
 def _english_description(cve: dict[str, Any]) -> str:
@@ -40,21 +93,18 @@ def _cvss(cve: dict[str, Any]) -> tuple[float | None, str]:
 
 def _affected_products(cve: dict[str, Any]) -> list[dict[str, Any]]:
     products: list[dict[str, Any]] = []
-    configurations = cve.get("configurations") or []
-    for configuration in configurations:
+    for configuration in cve.get("configurations") or []:
         for node in configuration.get("nodes") or []:
             for match in node.get("cpeMatch") or []:
                 if not match.get("vulnerable", False):
                     continue
-                products.append(
-                    {
-                        "criteria": match.get("criteria"),
-                        "version_start_including": match.get("versionStartIncluding"),
-                        "version_start_excluding": match.get("versionStartExcluding"),
-                        "version_end_including": match.get("versionEndIncluding"),
-                        "version_end_excluding": match.get("versionEndExcluding"),
-                    }
-                )
+                products.append({
+                    "criteria": match.get("criteria"),
+                    "version_start_including": match.get("versionStartIncluding"),
+                    "version_start_excluding": match.get("versionStartExcluding"),
+                    "version_end_including": match.get("versionEndIncluding"),
+                    "version_end_excluding": match.get("versionEndExcluding"),
+                })
     return products
 
 
@@ -80,14 +130,7 @@ class NvdFeedClient:
         self._api_key = api_key
         self._timeout = timeout
 
-    async def fetch_recent(
-        self,
-        *,
-        published_after: datetime,
-        published_before: datetime,
-        start_index: int = 0,
-        results_per_page: int = 2000,
-    ) -> dict[str, Any]:
+    async def fetch_recent(self, *, published_after: datetime, published_before: datetime, start_index: int = 0, results_per_page: int = 2000) -> dict[str, Any]:
         headers = {"apiKey": self._api_key} if self._api_key else {}
         params = {
             "pubStartDate": published_after.isoformat(),
@@ -95,10 +138,12 @@ class NvdFeedClient:
             "startIndex": start_index,
             "resultsPerPage": results_per_page,
         }
-        async with httpx.AsyncClient(timeout=self._timeout) as client:
-            response = await client.get(NVD_CVE_API_URL, params=params, headers=headers)
-            response.raise_for_status()
-            return response.json()
+        return await _get_json_with_retry(
+            NVD_CVE_API_URL,
+            timeout=self._timeout,
+            params=params,
+            headers=headers,
+        )
 
 
 class CisaKevFeedClient:
@@ -106,10 +151,7 @@ class CisaKevFeedClient:
         self._timeout = timeout
 
     async def fetch_catalog(self) -> dict[str, Any]:
-        async with httpx.AsyncClient(timeout=self._timeout) as client:
-            response = await client.get(CISA_KEV_JSON_URL)
-            response.raise_for_status()
-            return response.json()
+        return await _get_json_with_retry(CISA_KEV_JSON_URL, timeout=self._timeout)
 
     @staticmethod
     def cve_ids(catalog: dict[str, Any]) -> set[str]:
