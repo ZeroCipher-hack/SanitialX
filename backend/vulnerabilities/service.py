@@ -57,6 +57,7 @@ class VulnerabilityService:
         inventory = await self._repository.list_software_inventory(agent_id)
         vulnerabilities = await self._repository.list_all_vulnerabilities()
         exposures: list[AssetVulnerabilityModel] = []
+        active_cve_ids: set[str] = set()
 
         for vuln in vulnerabilities:
             best_match: tuple[float, object, str] | None = None
@@ -102,8 +103,10 @@ class VulnerabilityService:
                     "last_evaluated": datetime.now(timezone.utc),
                 }
             )
+            active_cve_ids.add(vuln.cve_id)
             exposures.append(exposure)
 
+        await self._repository.delete_stale_exposures(agent_id, active_cve_ids)
         return sorted(exposures, key=lambda item: item.risk_score, reverse=True)
 
     @staticmethod
