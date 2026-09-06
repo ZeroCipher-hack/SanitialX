@@ -138,9 +138,9 @@ class VulnerabilityService:
     ) -> int:
         """Return a deterministic 0-100 exposure prioritization score.
 
-        ``criticality=None`` is neutral for callers without asset metadata.
-        An explicit but unknown value falls back to MEDIUM so malformed or
-        forward-compatible metadata does not silently under-prioritize risk.
+        ``criticality=None`` and unknown values are neutral. Only validated
+        asset criticality values contribute extra weight, preventing malformed
+        metadata from changing prioritization unexpectedly.
         """
         score = int((cvss_score or 0.0) * 6)
         if known_exploited:
@@ -151,8 +151,6 @@ class VulnerabilityService:
             score += 10
 
         if criticality is not None:
-            score += CRITICALITY_WEIGHTS.get(
-                str(criticality).upper(), CRITICALITY_WEIGHTS["MEDIUM"]
-            )
+            score += CRITICALITY_WEIGHTS.get(str(criticality).upper(), 0)
         score += min(max(asset_risk_score, 0), 100) // 10
         return min(score, 100)
