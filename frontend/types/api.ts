@@ -53,6 +53,16 @@ export interface Agent {
   memory_usage: number;
   risk_score: number;
   events_count: number;
+  asset_type?: 'ENDPOINT' | 'SERVER' | 'WORKSTATION' | 'CLOUD' | 'NETWORK' | 'CONTAINER' | 'OTHER';
+  criticality?: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+  environment?: 'PRODUCTION' | 'STAGING' | 'DEVELOPMENT' | 'TEST' | 'UNKNOWN';
+  lifecycle_status?: 'DISCOVERED' | 'MANAGED' | 'RETIRED' | 'EXCLUDED';
+  owner?: string | null;
+  internet_exposed?: boolean;
+  tags?: string[];
+  source?: string | null;
+  first_seen?: string | null;
+  inventory_updated_at?: string | null;
 }
 
 export interface HoneypotSession {
