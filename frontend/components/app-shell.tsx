@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Shield, Activity, AlertTriangle, FileText, Sliders, LogOut, Bell, X, Play, Cpu, Layers, Zap, Radio, Share2, Crosshair, Box, Brain, CheckCircle2, Loader2, BookOpen, ScrollText, Terminal, Bot, Server, ChevronRight, CircleDot } from 'lucide-react';
+import { Shield, Activity, AlertTriangle, FileText, Sliders, LogOut, Bell, X, Play, Cpu, Layers, Zap, Radio, Share2, Crosshair, Box, Brain, CheckCircle2, Loader2, BookOpen, ScrollText, Terminal, Bot, Server, ChevronRight, CircleDot, Bug } from 'lucide-react';
 import { useEffect, useState, useRef } from 'react';
 import { api, logout, runAttackSimulation } from '@/lib/api';
 import type { Incident } from '@/types/api';
@@ -81,6 +81,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <div className="nav-group-title">ANIQLASH</div>
           {item('/rules', 'Aniqlash qoidalari', <Sliders size={17} />)}
           {item('/techniques', 'MITRE ATT&CK', <Layers size={17} />)}
+          {item('/vulnerabilities', 'Vulnerability Center', <Bug size={17} />)}
 
           <div className="nav-group-title">MUHIT</div>
           {item('/agents', 'Endpoint agentlar', <Cpu size={17} />)}
@@ -156,6 +157,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <div className="rail-section-title"><Terminal size={14} /> Tezkor amallar</div>
               <Link href="/logs" className="rail-link"><span>Loglarni ko‘rish</span><ChevronRight size={13} /></Link>
               <Link href="/events" className="rail-link"><span>Hodisalarni ko‘rish</span><ChevronRight size={13} /></Link>
+              <Link href="/vulnerabilities" className="rail-link"><span>Zaifliklarni ko‘rish</span><ChevronRight size={13} /></Link>
               <Link href="/simulations" className="rail-link"><span>Simulyatsiyalar</span><ChevronRight size={13} /></Link>
               <Link href="/guide" className="rail-link"><span>Tizimni o‘rganish</span><ChevronRight size={13} /></Link>
             </div>
