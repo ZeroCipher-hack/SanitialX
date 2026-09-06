@@ -1,9 +1,11 @@
-/* Compact quick-actions treatment for the SOC workspace. Imported from app-shell.tsx. */
-.quick-actions-wrap{position:relative}
-.quick-actions-trigger{display:flex;align-items:center;gap:7px;border:1px solid #24404d;background:#09141b;color:#b9cbd3;border-radius:7px;padding:8px 10px;font-size:10px;cursor:pointer;transition:.18s}
-.quick-actions-trigger:hover,.quick-actions-trigger[aria-expanded="true"]{border-color:#2d7183;color:#8cf1ff;background:#0b1b23}
-.quick-actions-menu{position:absolute;right:0;top:calc(100% + 8px);width:220px;padding:7px;background:#081119;border:1px solid #24404d;border-radius:10px;box-shadow:0 18px 60px #000b;z-index:60}
-.quick-actions-menu a{display:flex;align-items:center;justify-content:space-between;padding:9px 10px;border-radius:7px;color:#8fa2ad;text-decoration:none;font-size:10px}
-.quick-actions-menu a:hover{background:#0d2029;color:#e9fcff}
-@media(max-width:1439px){.workspace-layout{grid-template-columns:minmax(0,1fr)!important}.secondary-rail{position:static!important;width:auto!important;max-width:none!important;display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;border-left:0!important;border-top:1px solid #1a2a36}.secondary-rail>.rail-header,.secondary-rail>.rail-footer-note{grid-column:1/-1}}
-@media(max-width:900px){.secondary-rail{grid-template-columns:1fr}.secondary-rail>*{grid-column:1!important}}
+/* Responsive workspace cleanup: remove the always-visible quick-actions card and keep the rail from covering content. */
+.secondary-rail > .rail-section:nth-of-type(3){display:none}
+@media(max-width:1439px){
+  .workspace-layout{grid-template-columns:minmax(0,1fr)!important}
+  .secondary-rail{position:static!important;width:auto!important;max-width:none!important;display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;border-left:0!important;border-top:1px solid #1a2a36}
+  .secondary-rail>.rail-header,.secondary-rail>.rail-footer-note{grid-column:1/-1}
+}
+@media(max-width:900px){
+  .secondary-rail{grid-template-columns:1fr}
+  .secondary-rail>*{grid-column:1!important}
+}
