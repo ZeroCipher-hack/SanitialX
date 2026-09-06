@@ -249,7 +249,6 @@ class Agent:
         return None
 
     def collect_auth_events(self, max_lines: int = 2000) -> int:
-        """Read only newly appended SSH auth lines, surviving normal log rotation."""
         path = _find_auth_log()
         if path is None:
             return 0
@@ -282,14 +281,20 @@ class Agent:
         return queued
 
     def collect_system_events(self, max_lines: int = 200) -> int:
-        """Collect new warning-or-higher journal messages without shell execution."""
         if not Path("/run/systemd/system").exists():
             return 0
-        since = self.journal_cursor_path.read_text().strip() if self.journal_cursor_path.exists() else "now"
         now_epoch = str(int(time.time()))
+        if not self.journal_cursor_path.exists():
+            secure_write(self.journal_cursor_path, now_epoch + "\n")
+            return 0
+        since = self.journal_cursor_path.read_text().strip()
+        try:
+            since_epoch = max(0, int(since))
+        except ValueError:
+            since_epoch = int(time.time())
         try:
             proc = subprocess.run(
-                ["journalctl", "--no-pager", "--output=json", "--priority=0..4", f"--since=@{since}"],
+                ["journalctl", "--no-pager", "--output=json", "--priority=0..4", f"--since=@{since_epoch}"],
                 text=True,
                 capture_output=True,
                 check=True,
