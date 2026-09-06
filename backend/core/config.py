@@ -13,7 +13,6 @@ import os
 from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-# Known placeholder values that must never be used outside local dev.
 _INSECURE_SECRET_VALUES = {
     "sentinelx-secret-key-change-in-production",
     "change_this_placeholder_api_key_in_production",
@@ -43,89 +42,58 @@ class Settings(BaseSettings):
     environment: str = Field(default="development")
     api_host: str = Field(default="0.0.0.0")
     api_port: int = Field(default=8000)
-    frontend_origin: str = Field(
-        default="http://localhost:3000,http://127.0.0.1:3000"
-    )
+    frontend_origin: str = Field(default="http://localhost:3000,http://127.0.0.1:3000")
 
     api_key: str = Field(..., description="API Key for placeholder auth")
     jwt_secret_key: str = Field(..., description="JWT signing secret key")
     jwt_algorithm: str = Field(default="HS256")
 
-    gemini_api_key: str | None = Field(
-        default=None,
-        description="Google Gemini API key; keep server-side only",
-    )
-    gemini_model: str = Field(
-        default="gemini-3.6-flash",
-        description="Gemini model used for incident analysis",
-    )
+    agent_heartbeat_interval_seconds: int = Field(default=30, ge=5, le=3600)
+    agent_offline_timeout_seconds: int = Field(default=120, ge=15, le=86400)
+    agent_offline_check_interval_seconds: int = Field(default=30, ge=5, le=3600)
+
+    gemini_api_key: str | None = Field(default=None, description="Google Gemini API key; keep server-side only")
+    gemini_model: str = Field(default="gemini-3.6-flash", description="Gemini model used for incident analysis")
 
     database_url: str = Field(
         default="postgresql+asyncpg://sentinelx:sentinelx@localhost:5432/sentinelx",
         description="PostgreSQL async database URL",
     )
-    redis_url: str = Field(
-        default="redis://localhost:6379/0",
-        description="Redis connection URL",
-    )
+    redis_url: str = Field(default="redis://localhost:6379/0", description="Redis connection URL")
 
     @model_validator(mode="after")
     def _normalize_and_validate(self) -> "Settings":
-        # Backwards-compatible support for Render services that still expose
-        # the unprefixed names. Only use these when the prefixed values are
-        # missing/blank; normal SENTINELX_* variables always win.
         if not self.database_url.strip():
             legacy_database_url = os.getenv("DATABASE_URL", "").strip()
             if legacy_database_url:
                 self.database_url = legacy_database_url
-
         if not self.redis_url.strip():
             legacy_redis_url = os.getenv("REDIS_URL", "").strip()
             if legacy_redis_url:
                 self.redis_url = legacy_redis_url
-
         if self.jwt_secret_key in _INSECURE_SECRET_VALUES:
-            raise ValueError(
-                "SENTINELX_JWT_SECRET_KEY is set to a known placeholder value. "
-                "Generate a real secret, e.g. `openssl rand -hex 32`."
-            )
+            raise ValueError("SENTINELX_JWT_SECRET_KEY is set to a known placeholder value. Generate a real secret, e.g. `openssl rand -hex 32`.")
         if len(self.jwt_secret_key) < _MIN_SECRET_LENGTH:
-            raise ValueError(
-                f"SENTINELX_JWT_SECRET_KEY must be at least {_MIN_SECRET_LENGTH} "
-                "characters. Generate one with `openssl rand -hex 32`."
-            )
+            raise ValueError(f"SENTINELX_JWT_SECRET_KEY must be at least {_MIN_SECRET_LENGTH} characters. Generate one with `openssl rand -hex 32`.")
         if self.api_key in _INSECURE_SECRET_VALUES:
-            raise ValueError(
-                "SENTINELX_API_KEY is set to a known placeholder value. "
-                "Set a real value via the SENTINELX_API_KEY environment variable."
-            )
+            raise ValueError("SENTINELX_API_KEY is set to a known placeholder value. Set a real value via the SENTINELX_API_KEY environment variable.")
+        if self.agent_offline_timeout_seconds <= self.agent_heartbeat_interval_seconds:
+            raise ValueError("SENTINELX_AGENT_OFFLINE_TIMEOUT_SECONDS must be greater than heartbeat interval.")
         return self
 
     @property
-    def ENVIRONMENT(self) -> str:
-        return self.environment
-
+    def ENVIRONMENT(self) -> str: return self.environment
     @property
-    def DATABASE_URL(self) -> str:
-        return self.database_url
-
+    def DATABASE_URL(self) -> str: return self.database_url
     @property
-    def REDIS_URL(self) -> str:
-        return self.redis_url
-
+    def REDIS_URL(self) -> str: return self.redis_url
     @property
-    def SNIFFER_INTERFACE(self) -> str:
-        return self.capture_interface
-
+    def SNIFFER_INTERFACE(self) -> str: return self.capture_interface
     @property
-    def SNIFFER_FILTER(self) -> str:
-        return self.capture_filter
-
+    def SNIFFER_FILTER(self) -> str: return self.capture_filter
     @property
-    def API_KEY(self) -> str:
-        return self.api_key
+    def API_KEY(self) -> str: return self.api_key
 
 
 def get_settings() -> Settings:
-    """Factory function returning a fresh Settings instance."""
     return Settings()
