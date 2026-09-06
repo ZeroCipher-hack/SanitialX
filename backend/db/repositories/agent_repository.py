@@ -38,3 +38,12 @@ class PostgresAgentRepository:
     async def get_agent(self, agent_id: str) -> dict[str, Any] | None:
         model = await self._session.get(AgentModel, agent_id)
         return model.to_dict() if model else None
+
+    async def get_agent_by_ip(self, ip_address: str | None) -> dict[str, Any] | None:
+        if not ip_address:
+            return None
+        result = await self._session.execute(
+            select(AgentModel).where(AgentModel.ip_address == ip_address).limit(1)
+        )
+        model = result.scalar_one_or_none()
+        return model.to_dict() if model else None
