@@ -11,6 +11,7 @@ from db.models.vulnerability import (
     AssetVulnerabilityModel,
     VulnerabilitySyncStateModel,
 )
+from db.models.vulnerability_alert import VulnerabilityAlertModel
 
 __all__ = [
     "UserORM",
@@ -24,4 +25,5 @@ __all__ = [
     "VulnerabilityModel",
     "AssetVulnerabilityModel",
     "VulnerabilitySyncStateModel",
+    "VulnerabilityAlertModel",
 ]
