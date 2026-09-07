@@ -4,11 +4,16 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Activity,
   AlertTriangle,
+  ArrowRight,
   ArrowUpRight,
+  Brain,
   CheckCircle2,
   Clock3,
   Cpu,
+  Database,
+  RadioTower,
   RefreshCw,
+  Server,
   ShieldCheck,
   Target,
   Wifi,
@@ -53,10 +58,18 @@ const EMPTY_ASSETS: AssetSummary = {
   stale_inventory_assets: 0,
 };
 
+const MAP_POINTS = [
+  { left: '23%', top: '41%' },
+  { left: '43%', top: '34%' },
+  { left: '57%', top: '43%' },
+  { left: '70%', top: '49%' },
+  { left: '79%', top: '68%' },
+];
+
 const windowMs = (range: TimeRange) =>
   range === '24H' ? 86_400_000 : range === '7D' ? 604_800_000 : 2_592_000_000;
 
-function ThreatChart({ incidents, timeRange }: { incidents: Incident[]; timeRange: TimeRange }) {
+function ActivityChart({ incidents, timeRange }: { incidents: Incident[]; timeRange: TimeRange }) {
   const chartData = useMemo(() => {
     const buckets = timeRange === '24H' ? 24 : timeRange === '7D' ? 7 : 15;
     const counts = new Array(buckets).fill(0);
@@ -66,17 +79,14 @@ function ThreatChart({ incidents, timeRange }: { incidents: Incident[]; timeRang
     incidents.forEach((incident) => {
       const age = now - new Date(incident.created_at).getTime();
       if (age < 0 || age > span) return;
-      const bucket = Math.min(
-        buckets - 1,
-        Math.floor(((span - age) / span) * buckets)
-      );
+      const bucket = Math.min(buckets - 1, Math.floor(((span - age) / span) * buckets));
       counts[bucket] += 1;
     });
 
     const max = Math.max(...counts, 1);
     return counts.map((count, index) => ({
       count,
-      height: Math.max(4, (count / max) * 95),
+      height: Math.max(4, (count / max) * 100),
       label:
         timeRange === '24H'
           ? index % 4 === 0
@@ -90,25 +100,51 @@ function ThreatChart({ incidents, timeRange }: { incidents: Incident[]; timeRang
     }));
   }, [incidents, timeRange]);
 
-  const max = Math.max(...chartData.map((item) => item.count), 1);
-
   return (
-    <div className="chart">
-      <div className="chart-grid">
-        <span>{max}</span>
-        <span>{Math.ceil(max * 0.75)}</span>
-        <span>{Math.ceil(max * 0.5)}</span>
-        <span>{Math.ceil(max * 0.25)}</span>
-        <span>0</span>
-      </div>
-      <div className="bars">
+    <div className="soc-chart">
+      <div className="soc-chart-grid"><i /><i /><i /><i /></div>
+      <div className="soc-bars">
         {chartData.map((item, index) => (
-          <div className="bar-wrap" key={index} title={`${item.count} incidents`}>
-            <div className="bar" style={{ height: `${item.height}%` }} />
+          <div className="soc-bar-wrap" key={index} title={`${item.count} incident`}>
+            <div className="soc-bar" style={{ height: `${item.height}%` }} />
             <span>{item.label}</span>
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+function ThreatMap({ sources }: { sources: [string, number][] }) {
+  return (
+    <div className="soc-map">
+      <svg className="soc-world" viewBox="0 0 1000 460" aria-hidden="true">
+        <path className="gridline" d="M0 115H1000M0 230H1000M0 345H1000M250 0V460M500 0V460M750 0V460" />
+        <path d="M78 122l48-45 66-13 63 17 32 34 41 5 22 28-24 38-44 20-28 47-45 6-34-31-45-12-22-43-38-16z" />
+        <path d="M278 270l38 9 31 42-4 55-23 54-20-5-14-46-20-47z" />
+        <path d="M440 106l43-22 46 8 27 25 27-8 34 12 28 35 54 8 42 34-15 35-51 9-21 38-52-7-31 26-45-17-11-39-39-16-30-43-26-9 9-44z" />
+        <path d="M490 246l50 14 45 34-2 57-30 65-41-13-21-50-18-56z" />
+        <path d="M742 315l44-24 56 8 41 32-8 35-48 15-49-14-29-24z" />
+        <path d="M384 118l18-19 17 9-2 22-22 5zM865 195l18-12 16 15-9 17z" />
+        {sources.slice(0, 4).map((_, index) => {
+          const x1 = [230, 430, 570, 700][index];
+          const y1 = [190, 155, 195, 220][index];
+          return <path key={index} className="soc-arc" d={`M${x1} ${y1} Q500 ${45 + index * 18} 620 205`} />;
+        })}
+      </svg>
+
+      {sources.slice(0, 5).map(([ip, count], index) => (
+        <div key={ip} style={{ position: 'absolute', ...MAP_POINTS[index] }}>
+          <span className="soc-map-point" />
+          <div className="soc-map-label"><b>{ip}</b><strong>{count} incident</strong><br />source telemetry</div>
+        </div>
+      ))}
+
+      {!sources.length && <div className="soc-map-empty">Hozircha source IP telemetriyasi mavjud emas.</div>}
+      <div className="soc-map-legend">
+        <span><i className="crit" />Kritik</span><span><i className="high" />Yuqori</span>
+      </div>
+      <div className="soc-map-note">Geo nuqtalar vizual · source IP ma’lumoti real</div>
     </div>
   );
 }
@@ -168,9 +204,7 @@ export default function Dashboard() {
       high: filtered.filter((item) => item.severity === 'HIGH').length,
       medium: filtered.filter((item) => item.severity === 'MEDIUM').length,
       low: filtered.filter((item) => item.severity === 'LOW').length,
-      active: filtered.filter(
-        (item) => item.status === 'OPEN' || item.status === 'INVESTIGATING'
-      ).length,
+      active: filtered.filter((item) => item.status === 'OPEN' || item.status === 'INVESTIGATING').length,
     }),
     [filtered]
   );
@@ -184,34 +218,12 @@ export default function Dashboard() {
     });
   }, [events, timeRange]);
 
-  const priorityVulns = useMemo(
-    () => [...vulnAlerts].sort((a, b) => b.risk_score - a.risk_score).slice(0, 5),
-    [vulnAlerts]
-  );
-  const highVulns = vulnAlerts.filter(
-    (item) => item.severity === 'CRITICAL' || item.severity === 'HIGH'
-  ).length;
-
-  const riskIndex = Math.min(
-    100,
-    Math.round(
-      counts.critical * 12 +
-        counts.high * 7 +
-        counts.active * 4 +
-        assets.high_risk_assets * 5 +
-        highVulns * 3
-    )
-  );
-  const securityScore = Math.max(0, 1000 - riskIndex * 10);
-  const posture =
-    riskIndex >= 75 ? 'CRITICAL' : riskIndex >= 50 ? 'ELEVATED' : riskIndex >= 25 ? 'MODERATE' : 'LOW';
-
-  const managedCoverage = assets.total_assets
-    ? Math.round((assets.managed_assets / assets.total_assets) * 100)
-    : 0;
-  const freshCoverage = assets.total_assets
-    ? Math.max(0, Math.round(((assets.total_assets - assets.stale_inventory_assets) / assets.total_assets) * 100))
-    : 0;
+  const highVulns = vulnAlerts.filter((item) => item.severity === 'CRITICAL' || item.severity === 'HIGH').length;
+  const riskIndex = Math.min(100, Math.round(
+    counts.critical * 12 + counts.high * 7 + counts.active * 4 + assets.high_risk_assets * 5 + highVulns * 3
+  ));
+  const securityScore = Math.max(0, 100 - riskIndex);
+  const managedCoverage = assets.total_assets ? Math.round((assets.managed_assets / assets.total_assets) * 100) : 0;
 
   const sources = Array.from(
     filtered
@@ -221,252 +233,136 @@ export default function Dashboard() {
         new Map()
       )
       .entries()
-  )
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 5);
+  ).sort((a, b) => b[1] - a[1]).slice(0, 5);
+
+  const totalSeverity = Math.max(counts.critical + counts.high + counts.medium + counts.low, 1);
+  const pct = (value: number) => Math.round((value / totalSeverity) * 100);
+  const recentIncidents = [...filtered]
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+    .slice(0, 6);
+
+  const serviceHealth = [
+    { name: 'Telemetriya API', icon: <Server />, degraded: errors.length > 0 },
+    { name: 'Hodisalar oqimi', icon: <RadioTower />, degraded: errors.includes('events') },
+    { name: 'Asset inventory', icon: <Cpu />, degraded: errors.includes('assets') },
+    { name: 'CVE monitor', icon: <Database />, degraded: errors.includes('vulnerabilities') },
+  ];
 
   return (
-    <main className="page">
-      <header className="page-header">
+    <main className="soc-dashboard">
+      <section className="soc-hero">
         <div>
-          <div className="eyebrow">SECURITY OPERATIONS CENTER</div>
-          <h1>Command Center</h1>
-          <p>Live incidents, events, managed assets and vulnerability exposure in one SOC view.</p>
+          <div className="soc-kicker">SECURITY OPERATIONS CENTER</div>
+          <h1>Xush kelibsiz, To‘lqin <span>👋</span></h1>
+          <p>Real-time tahdidlar, hodisalar, endpointlar va zaifliklar bitta operatsion markazda.</p>
         </div>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <div className="live">
-            <span className="pulse" /> AUTO REFRESH <span className="live-time">15 SEC</span>
-          </div>
-          <button className="refresh" onClick={load} disabled={loading}>
-            <RefreshCw size={14} className={loading ? 'animate-spin' : ''} /> Refresh
-          </button>
+        <div className="soc-hero-meta">
+          <div className="soc-quote"><strong>SANITIALX</strong>Better detection. A safer tomorrow.</div>
+          <div className="soc-live"><i />LIVE</div>
+          <button className="soc-refresh" onClick={load} disabled={loading}><RefreshCw size={14} className={loading ? 'animate-spin' : ''} /> Yangilash</button>
         </div>
-      </header>
-
-      {errors.length > 0 && (
-        <div className="api-warning">
-          Partial telemetry unavailable: {errors.join(', ')}. Healthy data sources continue updating.
-        </div>
-      )}
-
-      <section className="stats">
-        <Stat
-          icon={<ShieldCheck />}
-          label="Security score"
-          value={String(securityScore)}
-          suffix="/1000"
-          trend={errors.length ? 'Partial telemetry' : 'Live telemetry'}
-          good={!errors.length}
-        />
-        <Stat
-          icon={<AlertTriangle />}
-          label="Critical incidents"
-          value={String(counts.critical).padStart(2, '0')}
-          trend={`${timeRange} · ${counts.active} active`}
-          danger={counts.critical > 0}
-        />
-        <Stat
-          icon={<Target />}
-          label="Vulnerability alerts"
-          value={String(vulnAlerts.length)}
-          trend={`${highVulns} high / critical`}
-          danger={highVulns > 0}
-        />
-        <Stat
-          icon={<Cpu />}
-          label="Protected assets"
-          value={String(assets.total_assets)}
-          trend={`${assets.managed_assets} managed · ${assets.offline_assets} offline`}
-          good={assets.offline_assets === 0}
-        />
       </section>
 
-      <section className="grid-main">
-        <div className="panel threat-panel">
-          <div className="panel-head">
-            <div>
-              <h2>Incident activity ({timeRange})</h2>
-              <span>Real incident timestamps only — no synthetic chart fallback</span>
-            </div>
+      {errors.length > 0 && <div className="soc-warning">Qisman telemetriya mavjud emas: {errors.join(', ')}.</div>}
+
+      <section className="soc-stats">
+        <Stat variant="cyan" icon={<ShieldCheck />} label="Xavfsizlik holati" value={String(securityScore)} suffix="/100" trend={`${100 - riskIndex}% himoya indeksi`} />
+        <Stat variant="red" icon={<AlertTriangle />} label="Kritik hodisalar" value={String(counts.critical)} trend={`${counts.active} faol hodisa`} />
+        <Stat variant="orange" icon={<Target />} label="Faol zaifliklar" value={String(vulnAlerts.length)} trend={`${highVulns} yuqori / kritik`} />
+        <Stat variant="purple" icon={<Cpu />} label="Endpoint agentlar" value={String(assets.total_assets)} trend={`${managedCoverage}% boshqarilmoqda`} />
+      </section>
+
+      <section className="soc-stage">
+        <div className="soc-panel">
+          <div className="soc-panel-head">
+            <div><h2>Global Threat Map</h2><p>Source IP telemetriyasi va real incident oqimi</p></div>
             <div className="range">
               {(['24H', '7D', '30D'] as TimeRange[]).map((range) => (
-                <button
-                  key={range}
-                  className={timeRange === range ? 'active' : ''}
-                  onClick={() => setTimeRange(range)}
-                >
-                  {range}
-                </button>
+                <button key={range} className={timeRange === range ? 'active' : ''} onClick={() => setTimeRange(range)}>{range}</button>
               ))}
             </div>
           </div>
-          <ThreatChart incidents={filtered} timeRange={timeRange} />
-          <div className="legend">
-            <span><i className="dot critical" />Critical {counts.critical}</span>
-            <span><i className="dot high" />High {counts.high}</span>
-            <span><i className="dot medium" />Medium {counts.medium}</span>
-            <span><i className="dot low" />Low {counts.low}</span>
-          </div>
+          <ThreatMap sources={sources} />
         </div>
 
-        <div className="panel score-panel">
-          <div className="panel-head">
-            <div>
-              <h2>Risk posture</h2>
-              <span>Deterministic SOC overview</span>
+        <div className="soc-stack">
+          <div className="soc-panel soc-ai">
+            <div className="soc-ai-top">
+              <div className="soc-ai-bot"><Brain size={23} /></div>
+              <div><h3>AI SOC Analyst</h3><p>Hodisa va tahdidlarni AI yordamida tahlil qiling, keyingi qadamlarni tezroq toping.</p></div>
             </div>
-            <Activity className="muted-icon" />
+            <a href="/ai-analysis" className="soc-ai-button"><span>AI tahlilni ochish</span><i><ArrowRight size={15} /></i></a>
           </div>
-          <div className="gauge">
-            <div className="gauge-ring">
-              <div>
-                <strong>{posture}</strong>
-                <small>{riskIndex}/100 risk index</small>
-              </div>
-            </div>
+
+          <div className="soc-panel soc-incidents">
+            <div className="soc-panel-head"><div><h2>So‘nggi hodisalar</h2><p>Tanlangan vaqt oralig‘i</p></div><a className="soc-panel-link" href="/incidents">Barchasi <ArrowUpRight size={13} /></a></div>
+            {recentIncidents.map((incident) => (
+              <a href={`/incidents?id=${incident.incident_id}`} className="soc-incident" key={incident.incident_id}>
+                <span className={`soc-sev ${incident.severity.toLowerCase()}`}>{incident.severity}</span>
+                <div className="soc-incident-copy"><b>{incident.title}</b><span>{incident.source_ip || incident.incident_id}</span></div>
+                <time>{new Date(incident.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</time>
+              </a>
+            ))}
+            {!recentIncidents.length && <div className="empty">Faol incident topilmadi.</div>}
           </div>
-          <div className="risk-row"><span>High-risk assets</span><b>{assets.high_risk_assets}</b></div>
-          <div className="risk-row"><span>Internet-facing assets</span><b>{assets.internet_facing_assets}</b></div>
-          <div className="risk-row"><span>Stale inventories</span><b>{assets.stale_inventory_assets}</b></div>
         </div>
       </section>
 
-      <section className="grid-bottom">
-        <div className="panel events">
-          <div className="panel-head">
-            <div>
-              <h2>Live security events</h2>
-              <span>{recentEvents.length} events in selected range</span>
-            </div>
-            <a className="ghost" href="/events">View all <ArrowUpRight size={15} /></a>
-          </div>
-          {events.slice(0, 6).map((event) => (
-            <div className="event" key={event.event_id}>
-              <div className={`severity ${event.severity.toLowerCase()}`} />
-              <div className="event-main">
-                <b>{event.event_type}</b>
-                <span>
-                  {event.source_ip || 'unknown'} <em>→</em> {event.destination_ip || event.host || 'unknown'}
-                  {event.mitre_technique ? ` · ${event.mitre_technique}` : ''}
-                </span>
-              </div>
-              <span className={`badge ${event.severity.toLowerCase()}`}>{event.severity}</span>
-              <time>{new Date(event.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</time>
-            </div>
-          ))}
-          {!events.length && <div className="empty">No persisted security events yet.</div>}
+      <section className="soc-bottom">
+        <div className="soc-panel">
+          <div className="soc-panel-head"><div><h2>Hodisa faolligi ({timeRange})</h2><p>Persisted incident timestamp ma’lumotlari</p></div><Activity size={16} color="#1ed8ff" /></div>
+          <div className="soc-activity-body"><ActivityChart incidents={filtered} timeRange={timeRange} /></div>
         </div>
 
-        <div className="panel sources">
-          <div className="panel-head">
-            <div>
-              <h2>Top attack sources</h2>
-              <span>Source IPs from current incident telemetry</span>
+        <div className="soc-panel">
+          <div className="soc-panel-head"><div><h2>Tahdid darajalari</h2><p>Incident severity taqsimoti</p></div></div>
+          <div className="soc-donut-wrap">
+            <div style={{ position: 'relative' }}>
+              <div className="soc-donut" style={{ '--critical': pct(counts.critical), '--high': pct(counts.high), '--medium': pct(counts.medium) } as React.CSSProperties} />
+              <div className="soc-donut-center"><b>{filtered.length}</b><span>Jami</span></div>
+            </div>
+            <div className="soc-donut-legend">
+              <LegendDot color="#ff405c" label="Kritik" value={pct(counts.critical)} />
+              <LegendDot color="#ff9d2e" label="Yuqori" value={pct(counts.high)} />
+              <LegendDot color="#ffd05a" label="O‘rta" value={pct(counts.medium)} />
+              <LegendDot color="#2bbcff" label="Past" value={pct(counts.low)} />
             </div>
           </div>
-          {sources.map(([ip, count]) => (
-            <div className="source" key={ip}>
-              <div className="source-top"><b>{ip}</b><span>Incident source</span><strong>{count}</strong></div>
-              <div className="progress">
-                <i style={{ width: `${Math.min(100, (count / Math.max(sources[0]?.[1] || 1, 1)) * 100)}%` }} />
+        </div>
+
+        <div className="soc-panel soc-health-panel">
+          <div className="soc-panel-head"><div><h2>Tizim holati</h2><p>Frontend ko‘rayotgan backend servislar</p></div></div>
+          <div className="soc-health">
+            {serviceHealth.map((service) => (
+              <div className="soc-health-row" key={service.name}>
+                <div className="soc-health-name">{service.icon}<span>{service.name}</span></div>
+                <div className={`soc-health-state ${service.degraded ? 'degraded' : ''}`}><i />{service.degraded ? 'Cheklangan' : 'Ishlayapti'}</div>
               </div>
-            </div>
-          ))}
-          {!sources.length && <div className="empty">No source IP telemetry in selected range.</div>}
+            ))}
+          </div>
         </div>
       </section>
 
-      <section className="grid-bottom" style={{ marginTop: 12 }}>
-        <div className="panel events">
-          <div className="panel-head">
-            <div>
-              <h2>Priority vulnerability exposure</h2>
-              <span>Unacknowledged CVE alerts sorted by asset risk</span>
-            </div>
-            <a className="ghost" href="/vulnerabilities">Open center <ArrowUpRight size={15} /></a>
-          </div>
-          {priorityVulns.map((alert) => (
-            <a
-              href={`/vulnerabilities?cve=${encodeURIComponent(alert.cve_id)}&agent_id=${encodeURIComponent(alert.agent_id)}`}
-              className="event"
-              key={alert.id}
-              style={{ textDecoration: 'none' }}
-            >
-              <div className={`severity ${alert.severity.toLowerCase()}`} />
-              <div className="event-main">
-                <b>{alert.cve_id}</b>
-                <span>{alert.agent_id} · {alert.title}</span>
-              </div>
-              <span className={`badge ${alert.severity.toLowerCase()}`}>{alert.severity}</span>
-              <time>{alert.risk_score}/100</time>
-            </a>
-          ))}
-          {!priorityVulns.length && <div className="empty">No unacknowledged vulnerability alerts.</div>}
-        </div>
-
-        <div className="panel sources">
-          <div className="panel-head">
-            <div>
-              <h2>Asset coverage</h2>
-              <span>Inventory quality and managed security coverage</span>
-            </div>
-            <a className="ghost" href="/agents">Open assets <ArrowUpRight size={15} /></a>
-          </div>
-          <Coverage label="Managed inventory" value={managedCoverage} detail={`${assets.managed_assets}/${assets.total_assets} assets`} />
-          <Coverage label="Fresh software inventory" value={freshCoverage} detail={`${assets.stale_inventory_assets} stale`} />
-          <Coverage label="Production assets" value={assets.total_assets ? Math.round((assets.production_assets / assets.total_assets) * 100) : 0} detail={`${assets.production_assets} production`} />
-          <Coverage label="Internet-facing assets" value={assets.total_assets ? Math.round((assets.internet_facing_assets / assets.total_assets) * 100) : 0} detail={`${assets.internet_facing_assets} exposed`} />
-        </div>
-      </section>
-
-      <section className="footer-strip">
-        <div><Wifi size={16} /><span>Telemetry</span><b className={errors.length ? '' : 'ok'}>{errors.length ? 'Degraded' : 'Operational'}</b></div>
-        <div><Activity size={16} /><span>Persisted events</span><b>{events.length}</b></div>
-        <div><Clock3 size={16} /><span>Last refresh</span><b>{lastRefresh ? lastRefresh.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '—'}</b></div>
-        <div><CheckCircle2 size={16} /><span>Production assets</span><b className="ok">{assets.production_assets}</b></div>
+      <section className="soc-footer">
+        <div><Wifi /><span>Telemetriya</span><b className={errors.length ? '' : 'ok'}>{errors.length ? 'Degraded' : 'Operational'}</b></div>
+        <div><Activity /><span>Eventlar</span><b>{recentEvents.length}</b></div>
+        <div><Clock3 /><span>Yangilangan</span><b>{lastRefresh ? lastRefresh.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '—'}</b></div>
+        <div><CheckCircle2 /><span>Production asset</span><b className="ok">{assets.production_assets}</b></div>
       </section>
     </main>
   );
 }
 
-function Coverage({ label, value, detail }: { label: string; value: number; detail: string }) {
-  return (
-    <div className="source">
-      <div className="source-top">
-        <b>{label}</b>
-        <span>{detail}</span>
-        <strong>{Math.min(100, Math.max(0, value))}%</strong>
-      </div>
-      <div className="progress"><i style={{ width: `${Math.min(100, Math.max(0, value))}%` }} /></div>
-    </div>
-  );
+function LegendDot({ color, label, value }: { color: string; label: string; value: number }) {
+  return <div><i style={{ background: color }} /><span>{label}</span><b>{value}%</b></div>;
 }
 
-function Stat({
-  icon,
-  label,
-  value,
-  suffix,
-  trend,
-  good,
-  danger,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: string;
-  suffix?: string;
-  trend: string;
-  good?: boolean;
-  danger?: boolean;
-}) {
+function Stat({ variant, icon, label, value, suffix, trend }: { variant: 'cyan' | 'red' | 'orange' | 'purple'; icon: React.ReactNode; label: string; value: string; suffix?: string; trend: string }) {
   return (
-    <div className="stat">
-      <div className="stat-icon">{icon}</div>
-      <div className="stat-copy">
-        <span>{label}</span>
-        <strong>{value}<small>{suffix}</small></strong>
-        <em className={danger ? 'bad' : good ? 'good' : ''}>{trend}</em>
-      </div>
+    <div className={`soc-stat ${variant}`}>
+      <div className="soc-stat-icon">{icon}</div>
+      <div className="soc-stat-copy"><span>{label}</span><strong>{value}<small>{suffix}</small></strong><em>{trend}</em></div>
+      <svg className="soc-mini-wave" viewBox="0 0 180 20" preserveAspectRatio="none" aria-hidden="true"><path d="M0 14 L12 9 L25 15 L38 5 L52 13 L65 8 L80 16 L94 10 L110 12 L125 4 L142 14 L158 8 L180 11" fill="none" stroke="currentColor" strokeWidth="1.5" /></svg>
     </div>
   );
 }
