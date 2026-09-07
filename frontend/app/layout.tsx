@@ -3,6 +3,7 @@ import './globals.css';
 import './shell-overrides.css';
 import './quick-actions.css';
 import './utility-rail.css';
+import './soc-theme.css';
 import { AppShell } from '@/components/app-shell';
 
 export const metadata: Metadata = {
