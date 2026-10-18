@@ -5,7 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import {
   Shield, Activity, AlertTriangle, FileText, Sliders, LogOut, Bell, X, Play, Cpu,
   Layers, Zap, Radio, Share2, Crosshair, Box, Brain, CheckCircle2, Loader2,
-  BookOpen, ScrollText, Bug, ChevronRight,
+  BookOpen, ScrollText, Bug, ChevronRight, ShieldAlert,
 } from 'lucide-react';
 import { useEffect, useState, useRef } from 'react';
 import { api, logout, runAttackSimulation } from '@/lib/api';
@@ -133,6 +133,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           {item('/rules', 'Aniqlash qoidalari', <Sliders size={17} />)}
           {item('/techniques', 'MITRE ATT&CK', <Layers size={17} />)}
           {item('/vulnerabilities', 'Vulnerability Center', <Bug size={17} />)}
+          {item('/exposure', 'Exposure (ustuvor)', <ShieldAlert size={17} />)}
 
           <div className="nav-group-title">MUHIT</div>
           {item('/agents', 'Endpoint agentlar', <Cpu size={17} />)}

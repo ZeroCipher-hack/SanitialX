@@ -54,6 +54,22 @@ class VulnerabilityService:
             offset=offset,
         )
 
+    async def list_enriched_exposures(
+        self,
+        *,
+        agent_id: str | None = None,
+        min_risk_score: int | None = None,
+        limit: int = 100,
+        offset: int = 0,
+    ):
+        """List exposures joined with CVE intelligence (risk + CVSS/EPSS/KEV)."""
+        return await self._repository.list_enriched_exposures(
+            agent_id=agent_id,
+            min_risk_score=min_risk_score,
+            limit=limit,
+            offset=offset,
+        )
+
     async def evaluate_agent(
         self,
         *,

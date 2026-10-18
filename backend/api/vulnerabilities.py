@@ -80,6 +80,23 @@ async def list_vulnerabilities(
     return [_vulnerability_to_dict(item) for item in items]
 
 
+def _enriched_exposure_to_dict(exposure, vuln) -> dict[str, Any]:
+    data = _exposure_to_dict(exposure)
+    data.update(
+        {
+            "cve_summary": vuln.summary,
+            "cvss_score": vuln.cvss_score,
+            "epss_score": vuln.epss_score,
+            "epss_percentile": vuln.epss_percentile,
+            "severity": vuln.severity,
+            "known_exploited": vuln.known_exploited,
+            "exploit_available": vuln.exploit_available,
+            "cve_published_at": vuln.published_at,
+        }
+    )
+    return data
+
+
 @router.get("/exposures")
 async def list_exposures(
     session: Annotated[AsyncSession, Depends(get_db_session)],
@@ -89,14 +106,19 @@ async def list_exposures(
     limit: int = Query(default=100, ge=1, le=500),
     offset: int = Query(default=0, ge=0),
 ) -> list[dict[str, Any]]:
+    """Prioritized asset exposures joined with CVE intel (CVSS/EPSS/KEV).
+
+    Returned rows are ordered by risk_score so the Exposure view can render
+    the prioritized list in a single request.
+    """
     service = VulnerabilityService(PostgresVulnerabilityRepository(session))
-    items = await service.list_exposures(
+    rows = await service.list_enriched_exposures(
         agent_id=agent_id,
         min_risk_score=min_risk_score,
         limit=limit,
         offset=offset,
     )
-    return [_exposure_to_dict(item) for item in items]
+    return [_enriched_exposure_to_dict(exposure, vuln) for exposure, vuln in rows]
 
 
 @router.post("/sync")
