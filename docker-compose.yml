@@ -126,6 +126,39 @@ services:
       migrate:
         condition: service_completed_successfully
 
+  # Low-interaction honeypot decoys. Opt-in only:
+  #   docker compose --profile honeypot up -d honeypot
+  # A decoy logs attacker connections (never executes input); the hits become
+  # the local "under active attack" signal that boosts matching exposures.
+  honeypot:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: sanitialx-honeypot
+    restart: unless-stopped
+    profiles: ["honeypot"]
+    env_file:
+      - ./backend/.env
+    command: python scripts/run_honeypot.py
+    ports:
+      - "${SANITIALX_HONEYPOT_SSH_PORT:-2222}:2222"
+      - "${SANITIALX_HONEYPOT_WEB_PORT:-8080}:8080"
+      - "${SANITIALX_HONEYPOT_TELNET_PORT:-2323}:2323"
+    environment:
+      SANITIALX_ENVIRONMENT: ${SANITIALX_ENVIRONMENT:-production}
+      SANITIALX_LOG_LEVEL: ${SANITIALX_LOG_LEVEL:-INFO}
+      SANITIALX_DATABASE_URL: ${SANITIALX_DATABASE_URL:-postgresql+asyncpg://sanitialx:sanitialx_password_change_me@postgres:5432/sanitialx}
+      SANITIALX_API_KEY: ${SANITIALX_API_KEY:?SANITIALX_API_KEY must be set in .env}
+      SANITIALX_JWT_SECRET_KEY: ${SANITIALX_JWT_SECRET_KEY:?SANITIALX_JWT_SECRET_KEY must be set in .env}
+      SANITIALX_HONEYPOT_ENABLED: "true"
+      SANITIALX_HONEYPOT_HOST: "0.0.0.0"
+      SANITIALX_HONEYPOT_PORTS: ${SANITIALX_HONEYPOT_PORTS:-2222:SSH,8080:Fake Web Panel,2323:Telnet}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
 volumes:
   postgres_data:
   redis_data:

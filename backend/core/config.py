@@ -86,6 +86,15 @@ class Settings(BaseSettings):
     gemini_api_key: str | None = Field(default=None, description="Google Gemini API key; keep server-side only")
     gemini_model: str = Field(default="gemini-2.5-flash", description="Gemini model used for incident analysis")
 
+    # Low-interaction honeypot decoy listeners. Disabled by default; a decoy
+    # only logs connection attempts and never executes attacker input.
+    honeypot_enabled: bool = Field(default=False, description="Start decoy honeypot listeners")
+    honeypot_host: str = Field(default="0.0.0.0", description="Bind address for honeypot decoys")
+    honeypot_ports: str = Field(
+        default="2222:SSH,8080:Fake Web Panel,2323:Telnet",
+        description="Comma-separated port:service decoys, e.g. '2222:SSH,8080:Fake Web Panel'",
+    )
+
     database_url: str = Field(
         default="postgresql+asyncpg://sanitialx:sanitialx@localhost:5432/sanitialx",
         description="PostgreSQL async database URL",

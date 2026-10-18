@@ -166,6 +166,37 @@ Remove the demo data with:
 PYTHONPATH=. python -m scripts.seed_demo_data --reset
 ```
 
+## Honeypot Decoys (local attack signal)
+
+Low-interaction honeypot decoys bind ports, log attacker connection attempts
+(captured input is logged, never executed), and record each as a honeypot
+session. Those hits become a local "under active attack" signal that boosts
+the risk of exposures on the same service — something a global feed like EPSS
+cannot provide.
+
+Decoys are opt-in. Run them with Compose:
+
+```bash
+docker compose --profile honeypot up -d honeypot
+```
+
+Or standalone:
+
+```bash
+cd backend
+SANITIALX_HONEYPOT_ENABLED=true \
+SANITIALX_HONEYPOT_PORTS="2222:SSH,8080:Fake Web Panel,2323:Telnet" \
+PYTHONPATH=. python -m scripts.run_honeypot
+```
+
+An external decoy or agent can also report a hit directly:
+
+```bash
+curl -X POST http://localhost:8000/api/v1/honeypots/events \
+  -H "Authorization: Bearer <JWT_TOKEN>" -H "Content-Type: application/json" \
+  -d '{"attacker_ip":"203.0.113.10","service":"SSH"}'
+```
+
 ## Final Docker Smoke Test
 
 After the stack is up and an analyst/admin operator exists, run the production-style smoke test from the repository root:
