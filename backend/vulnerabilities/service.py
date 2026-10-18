@@ -98,6 +98,7 @@ class VulnerabilityService:
                 internet_exposed=internet_exposed,
                 asset_risk_score=asset_risk_score,
                 criticality=criticality,
+                epss_score=vuln.epss_score,
             )
             exposure = await self._repository.upsert_exposure(
                 {
@@ -135,12 +136,18 @@ class VulnerabilityService:
         internet_exposed: bool,
         asset_risk_score: int = 0,
         criticality: str | None = None,
+        epss_score: float | None = None,
     ) -> int:
         """Return a deterministic 0-100 exposure prioritization score.
 
         ``criticality=None`` and unknown values are neutral. Only validated
         asset criticality values contribute extra weight, preventing malformed
         metadata from changing prioritization unexpectedly.
+
+        ``epss_score`` is the FIRST.org exploit-prediction probability (0..1).
+        CVSS alone over-ranks severe-but-never-exploited CVEs; EPSS folds in
+        the likelihood of real-world exploitation. ``None`` is neutral so the
+        score is unchanged when EPSS has not been synced yet.
         """
         score = int((cvss_score or 0.0) * 6)
         if known_exploited:
@@ -149,6 +156,10 @@ class VulnerabilityService:
             score += 10
         if internet_exposed:
             score += 10
+
+        if epss_score is not None:
+            clamped_epss = min(max(epss_score, 0.0), 1.0)
+            score += int(round(clamped_epss * 25))
 
         if criticality is not None:
             score += CRITICALITY_WEIGHTS.get(str(criticality).upper(), 0)

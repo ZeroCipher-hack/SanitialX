@@ -31,6 +31,8 @@ def _vulnerability_to_dict(model) -> dict[str, Any]:
         "cve_id": model.cve_id,
         "summary": model.summary,
         "cvss_score": model.cvss_score,
+        "epss_score": model.epss_score,
+        "epss_percentile": model.epss_percentile,
         "severity": model.severity,
         "published_at": model.published_at,
         "modified_at": model.modified_at,
