@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import os
 
-from pydantic import Field, model_validator
+from pydantic import AliasChoices, Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 _INSECURE_SECRET_VALUES = {
@@ -36,8 +36,21 @@ class Settings(BaseSettings):
     debug: bool = Field(default=False, description="Enable debug mode")
     log_level: str = Field(default="INFO", description="Logging level")
 
-    capture_interface: str = Field(default="eth0")
-    capture_filter: str = Field(default="")
+    # Accept both the canonical CAPTURE_* names and the SNIFFER_* names used
+    # historically in .env.example / docker-compose so documented config is
+    # never silently ignored.
+    capture_interface: str = Field(
+        default="eth0",
+        validation_alias=AliasChoices(
+            "SENTINELX_CAPTURE_INTERFACE", "SENTINELX_SNIFFER_INTERFACE"
+        ),
+    )
+    capture_filter: str = Field(
+        default="",
+        validation_alias=AliasChoices(
+            "SENTINELX_CAPTURE_FILTER", "SENTINELX_SNIFFER_FILTER"
+        ),
+    )
 
     environment: str = Field(default="development")
     api_host: str = Field(default="0.0.0.0")
