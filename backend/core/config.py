@@ -1,9 +1,11 @@
 """
-SentinelX configuration — single canonical Settings class.
+SanitialX configuration — single canonical Settings class.
 
-Uses pydantic-settings to load from environment variables (prefixed SENTINELX_)
-and an optional .env file. No module-level mutable singleton — callers must
-instantiate Settings() explicitly or receive it via dependency injection.
+Loads from environment variables prefixed ``SANITIALX_`` (and an optional
+.env file). The legacy ``SENTINELX_`` prefix is still accepted as a
+lower-priority fallback so existing deployments keep working. No
+module-level mutable singleton — callers must instantiate Settings()
+explicitly or receive it via dependency injection.
 """
 
 from __future__ import annotations
@@ -11,44 +13,56 @@ from __future__ import annotations
 import os
 
 from pydantic import AliasChoices, Field, model_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import (
+    BaseSettings,
+    DotEnvSettingsSource,
+    EnvSettingsSource,
+    PydanticBaseSettingsSource,
+    SettingsConfigDict,
+)
 
 _INSECURE_SECRET_VALUES = {
     "sentinelx-secret-key-change-in-production",
+    "sanitialx-secret-key-change-in-production",
     "change_this_placeholder_api_key_in_production",
     "sentinelx-jwt-secret-key-change-in-production",
+    "sanitialx-jwt-secret-key-change-in-production",
     "change_this_jwt_secret_key_to_a_secure_random_string_in_production",
 }
 _MIN_SECRET_LENGTH = 32
 
+_LEGACY_ENV_PREFIX = "SENTINELX_"
+
 
 class Settings(BaseSettings):
-    """Canonical application settings for SentinelX."""
+    """Canonical application settings for SanitialX."""
 
     model_config = SettingsConfigDict(
-        env_prefix="SENTINELX_",
+        env_prefix="SANITIALX_",
         env_file=".env",
         env_file_encoding="utf-8",
         extra="ignore",
     )
 
-    app_name: str = Field(default="SentinelX", description="Application name")
+    app_name: str = Field(default="SanitialX", description="Application name")
     debug: bool = Field(default=False, description="Enable debug mode")
     log_level: str = Field(default="INFO", description="Logging level")
 
-    # Accept both the canonical CAPTURE_* names and the SNIFFER_* names used
-    # historically in .env.example / docker-compose so documented config is
-    # never silently ignored.
+    # Accept the canonical CAPTURE_* names and the historical SNIFFER_* names,
+    # under both the SANITIALX_ and legacy SENTINELX_ prefixes, so documented
+    # config is never silently ignored.
     capture_interface: str = Field(
         default="eth0",
         validation_alias=AliasChoices(
-            "SENTINELX_CAPTURE_INTERFACE", "SENTINELX_SNIFFER_INTERFACE"
+            "SANITIALX_CAPTURE_INTERFACE", "SANITIALX_SNIFFER_INTERFACE",
+            "SENTINELX_CAPTURE_INTERFACE", "SENTINELX_SNIFFER_INTERFACE",
         ),
     )
     capture_filter: str = Field(
         default="",
         validation_alias=AliasChoices(
-            "SENTINELX_CAPTURE_FILTER", "SENTINELX_SNIFFER_FILTER"
+            "SANITIALX_CAPTURE_FILTER", "SANITIALX_SNIFFER_FILTER",
+            "SENTINELX_CAPTURE_FILTER", "SENTINELX_SNIFFER_FILTER",
         ),
     )
 
@@ -70,13 +84,44 @@ class Settings(BaseSettings):
     agent_windows_latest_version: str = Field(default="0.1.0")
 
     gemini_api_key: str | None = Field(default=None, description="Google Gemini API key; keep server-side only")
-    gemini_model: str = Field(default="gemini-3.6-flash", description="Gemini model used for incident analysis")
+    gemini_model: str = Field(default="gemini-2.5-flash", description="Gemini model used for incident analysis")
 
     database_url: str = Field(
-        default="postgresql+asyncpg://sentinelx:sentinelx@localhost:5432/sentinelx",
+        default="postgresql+asyncpg://sanitialx:sanitialx@localhost:5432/sanitialx",
         description="PostgreSQL async database URL",
     )
     redis_url: str = Field(default="redis://localhost:6379/0", description="Redis connection URL")
+
+    @classmethod
+    def settings_customise_sources(
+        cls,
+        settings_cls: type[BaseSettings],
+        init_settings: PydanticBaseSettingsSource,
+        env_settings: PydanticBaseSettingsSource,
+        dotenv_settings: PydanticBaseSettingsSource,
+        file_secret_settings: PydanticBaseSettingsSource,
+    ) -> tuple[PydanticBaseSettingsSource, ...]:
+        """Add legacy SENTINELX_-prefixed sources as a lower-priority fallback.
+
+        Canonical SANITIALX_ values (OS env, then .env) win; the legacy prefix
+        is consulted only when the canonical value is absent, keeping older
+        deployments working without a config change.
+        """
+        legacy_env = EnvSettingsSource(settings_cls, env_prefix=_LEGACY_ENV_PREFIX)
+        legacy_dotenv = DotEnvSettingsSource(
+            settings_cls,
+            env_file=".env",
+            env_file_encoding="utf-8",
+            env_prefix=_LEGACY_ENV_PREFIX,
+        )
+        return (
+            init_settings,
+            env_settings,
+            dotenv_settings,
+            legacy_env,
+            legacy_dotenv,
+            file_secret_settings,
+        )
 
     @model_validator(mode="after")
     def _normalize_and_validate(self) -> "Settings":
@@ -89,13 +134,13 @@ class Settings(BaseSettings):
             if legacy_redis_url:
                 self.redis_url = legacy_redis_url
         if self.jwt_secret_key in _INSECURE_SECRET_VALUES:
-            raise ValueError("SENTINELX_JWT_SECRET_KEY is set to a known placeholder value. Generate a real secret, e.g. `openssl rand -hex 32`.")
+            raise ValueError("SANITIALX_JWT_SECRET_KEY is set to a known placeholder value. Generate a real secret, e.g. `openssl rand -hex 32`.")
         if len(self.jwt_secret_key) < _MIN_SECRET_LENGTH:
-            raise ValueError(f"SENTINELX_JWT_SECRET_KEY must be at least {_MIN_SECRET_LENGTH} characters. Generate one with `openssl rand -hex 32`.")
+            raise ValueError(f"SANITIALX_JWT_SECRET_KEY must be at least {_MIN_SECRET_LENGTH} characters. Generate one with `openssl rand -hex 32`.")
         if self.api_key in _INSECURE_SECRET_VALUES:
-            raise ValueError("SENTINELX_API_KEY is set to a known placeholder value. Set a real value via the SENTINELX_API_KEY environment variable.")
+            raise ValueError("SANITIALX_API_KEY is set to a known placeholder value. Set a real value via the SANITIALX_API_KEY environment variable.")
         if self.agent_offline_timeout_seconds <= self.agent_heartbeat_interval_seconds:
-            raise ValueError("SENTINELX_AGENT_OFFLINE_TIMEOUT_SECONDS must be greater than heartbeat interval.")
+            raise ValueError("SANITIALX_AGENT_OFFLINE_TIMEOUT_SECONDS must be greater than heartbeat interval.")
         return self
 
     @property

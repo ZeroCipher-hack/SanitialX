@@ -1,5 +1,5 @@
 """
-User domain model for SentinelX authentication.
+User domain model for SanitialX authentication.
 
 Pure domain object — no infrastructure imports allowed.
 """
@@ -12,7 +12,7 @@ from datetime import datetime
 
 @dataclass(frozen=True, slots=True)
 class User:
-    """A SentinelX platform user."""
+    """A SanitialX platform user."""
 
     user_id: str
     username: str

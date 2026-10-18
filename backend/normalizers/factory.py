@@ -1,5 +1,5 @@
 """
-Normalizer factory for SentinelX.
+Normalizer factory for SanitialX.
 
 Provides a convenience function to build a pre-configured
 :class:`NormalizerRegistry` with all known normalizers.

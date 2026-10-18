@@ -1,4 +1,4 @@
-# SentinelX — Modular Async SIEM Backend
+# SanitialX — Modular Async SIEM Backend
 
 [![Python](https://img.shields.io/badge/Python-3.x-blue?logo=python)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-async-green?logo=fastapi)](https://fastapi.tiangolo.com/)
@@ -6,11 +6,11 @@
 [![Redis](https://img.shields.io/badge/Redis-Streams-red?logo=redis)](https://redis.io/)
 [![Docker](https://img.shields.io/badge/Docker-Compose-blue?logo=docker)](https://www.docker.com/)
 
-**SentinelX** is a security-focused, async-first SIEM backend for ingesting network events, normalizing telemetry, correlating detections, and managing security incidents through a secured REST API.
+**SanitialX** is a security-focused, async-first SIEM backend for ingesting network events, normalizing telemetry, correlating detections, and managing security incidents through a secured REST API.
 
 > **Status:** Active development
 
-## Why SentinelX?
+## Why SanitialX?
 
 The project demonstrates a production-oriented security event pipeline rather than a simple packet sniffer:
 

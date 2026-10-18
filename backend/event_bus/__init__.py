@@ -1,1 +1,1 @@
-# SentinelX EventBus Package
+# SanitialX EventBus Package

@@ -1,5 +1,5 @@
 """
-UserRepository abstraction for SentinelX.
+UserRepository abstraction for SanitialX.
 
 Defines the contract for persistent storage/lookup of Users.
 Pure domain interface — no infrastructure imports allowed.

@@ -13,8 +13,8 @@ jobs:
   backend:
     runs-on: ubuntu-latest
     env:
-      SENTINELX_API_KEY: ci-test-api-key
-      SENTINELX_JWT_SECRET_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+      SANITIALX_API_KEY: ci-test-api-key
+      SANITIALX_JWT_SECRET_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
     defaults:
       run:
         working-directory: backend
@@ -44,20 +44,20 @@ jobs:
       postgres:
         image: postgres:16-alpine
         env:
-          POSTGRES_USER: sentinelx
-          POSTGRES_PASSWORD: sentinelx_ci_password
-          POSTGRES_DB: sentinelx
+          POSTGRES_USER: sanitialx
+          POSTGRES_PASSWORD: sanitialx_ci_password
+          POSTGRES_DB: sanitialx
         ports:
           - 5432:5432
         options: >-
-          --health-cmd="pg_isready -U sentinelx -d sentinelx"
+          --health-cmd="pg_isready -U sanitialx -d sanitialx"
           --health-interval=5s
           --health-timeout=5s
           --health-retries=10
     env:
-      SENTINELX_API_KEY: ci-test-api-key
-      SENTINELX_JWT_SECRET_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
-      SENTINELX_DATABASE_URL: postgresql+asyncpg://sentinelx:sentinelx_ci_password@localhost:5432/sentinelx
+      SANITIALX_API_KEY: ci-test-api-key
+      SANITIALX_JWT_SECRET_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+      SANITIALX_DATABASE_URL: postgresql+asyncpg://sanitialx:sanitialx_ci_password@localhost:5432/sanitialx
     defaults:
       run:
         working-directory: backend

@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 import pytest
 import fakeredis.aioredis
-from async_asgi_testclient import TestClient
+import httpx
 
 from core.config import Settings
 from core.container import ApplicationContainer
@@ -34,7 +34,8 @@ async def client():
     app.state.container = container
     app.state.is_ready = True
 
-    async with TestClient(app) as test_client:
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as test_client:
         yield test_client
 
     await container.redis_client.aclose()
@@ -54,7 +55,7 @@ def _get_auth_headers(role: str = "analyst") -> dict[str, str]:
 
 class TestHealthAPI:
     @pytest.mark.asyncio
-    async def test_liveness_endpoint_unauthenticated(self, client: TestClient) -> None:
+    async def test_liveness_endpoint_unauthenticated(self, client: httpx.AsyncClient) -> None:
         response = await client.get("/api/v1/health")
         assert response.status_code == 200
         data = response.json()
@@ -62,12 +63,12 @@ class TestHealthAPI:
         assert data["is_ready"] is True
 
     @pytest.mark.asyncio
-    async def test_readiness_endpoint_unauthorized_without_token(self, client: TestClient) -> None:
+    async def test_readiness_endpoint_unauthorized_without_token(self, client: httpx.AsyncClient) -> None:
         response = await client.get("/api/v1/health/ready")
         assert response.status_code == 401
 
     @pytest.mark.asyncio
-    async def test_readiness_endpoint_authenticated(self, client: TestClient) -> None:
+    async def test_readiness_endpoint_authenticated(self, client: httpx.AsyncClient) -> None:
         headers = _get_auth_headers("reader")
         response = await client.get("/api/v1/health/ready", headers=headers)
         assert response.status_code == 200
@@ -76,19 +77,19 @@ class TestHealthAPI:
 
 class TestIncidentsAPI:
     @pytest.mark.asyncio
-    async def test_list_incidents_empty_authenticated(self, client: TestClient) -> None:
+    async def test_list_incidents_empty_authenticated(self, client: httpx.AsyncClient) -> None:
         headers = _get_auth_headers("reader")
         response = await client.get("/api/v1/incidents", headers=headers)
         assert response.status_code == 200
         assert response.json() == []
 
     @pytest.mark.asyncio
-    async def test_patch_incident_status_unauthorized_missing_token(self, client: TestClient) -> None:
+    async def test_patch_incident_status_unauthorized_missing_token(self, client: httpx.AsyncClient) -> None:
         response = await client.patch("/api/v1/incidents/inc-1/status", json={"status": "INVESTIGATING"})
         assert response.status_code == 401
 
     @pytest.mark.asyncio
-    async def test_patch_incident_status_forbidden_reader_role(self, client: TestClient) -> None:
+    async def test_patch_incident_status_forbidden_reader_role(self, client: httpx.AsyncClient) -> None:
         headers = _get_auth_headers("reader")
         response = await client.patch(
             "/api/v1/incidents/inc-1/status",
@@ -98,7 +99,7 @@ class TestIncidentsAPI:
         assert response.status_code == 403
 
     @pytest.mark.asyncio
-    async def test_patch_incident_status_success_analyst_role(self, client: TestClient) -> None:
+    async def test_patch_incident_status_success_analyst_role(self, client: httpx.AsyncClient) -> None:
         container: ApplicationContainer = app.state.container
         from correlation.enums import Severity
         from incidents.enums import IncidentStatus
@@ -129,7 +130,7 @@ class TestIncidentsAPI:
 
 class TestRulesAPI:
     @pytest.mark.asyncio
-    async def test_put_and_get_rule(self, client: TestClient) -> None:
+    async def test_put_and_get_rule(self, client: httpx.AsyncClient) -> None:
         headers = _get_auth_headers("admin")
         payload = {
             "rule_name": "Custom PortScan",
@@ -199,7 +200,7 @@ class TestAssetsAPI:
             )
 
     @pytest.mark.asyncio
-    async def test_asset_metadata_update_and_filters(self, client: TestClient) -> None:
+    async def test_asset_metadata_update_and_filters(self, client: httpx.AsyncClient) -> None:
         await self._seed_asset()
         headers = _get_auth_headers("analyst")
 
@@ -231,7 +232,7 @@ class TestAssetsAPI:
         assert listing.json()[0]["agent_id"] == "asset-1"
 
     @pytest.mark.asyncio
-    async def test_asset_detail_includes_exposure_summary(self, client: TestClient) -> None:
+    async def test_asset_detail_includes_exposure_summary(self, client: httpx.AsyncClient) -> None:
         await self._seed_asset()
         headers = _get_auth_headers("reader")
         detail = await client.get("/api/v1/agents/asset-1", headers=headers)
@@ -248,7 +249,7 @@ class TestAssetsAPI:
         }
 
     @pytest.mark.asyncio
-    async def test_reader_cannot_change_asset_metadata(self, client: TestClient) -> None:
+    async def test_reader_cannot_change_asset_metadata(self, client: httpx.AsyncClient) -> None:
         await self._seed_asset()
         response = await client.patch(
             "/api/v1/agents/asset-1",

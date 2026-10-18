@@ -1,5 +1,5 @@
 """
-API Request and Response schemas for SentinelX endpoints.
+API Request and Response schemas for SanitialX endpoints.
 """
 
 from __future__ import annotations
