@@ -1,9 +1,14 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { Zap, RefreshCw, Terminal, Lock, ShieldAlert, CheckCircle2 } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { RefreshCw, ShieldAlert, Crosshair, Flame, Users } from 'lucide-react';
 import { fetchHoneypots } from '@/lib/api';
 import type { HoneypotSession } from '@/types/api';
+
+function isRecent(iso: string, hours = 24): boolean {
+  const t = new Date(iso).getTime();
+  return Number.isFinite(t) && Date.now() - t <= hours * 3600 * 1000;
+}
 
 export default function HoneypotsPage() {
   const [sessions, setSessions] = useState<HoneypotSession[]>([]);
@@ -21,66 +26,72 @@ export default function HoneypotsPage() {
 
   useEffect(load, []);
 
+  const stats = useMemo(() => {
+    const uniqueIps = new Set(sessions.map((s) => s.attacker_ip)).size;
+    const services = new Set(sessions.map((s) => s.service)).size;
+    const maxRisk = sessions.reduce((m, s) => Math.max(m, s.risk_score), 0);
+    const activeServices = Array.from(
+      new Set(sessions.filter((s) => isRecent(s.started_at)).map((s) => s.service)),
+    );
+    return { uniqueIps, services, maxRisk, activeServices };
+  }, [sessions]);
+
   return (
     <main className="page">
-      <div className="eyebrow">DECEPTION TECHNOLOGY</div>
+      <div className="eyebrow">DECEPTION · LOKAL HUJUM SIGNALI</div>
       <div className="page-header">
         <div>
-          <h1>Honeypot & Deception Vault</h1>
-          <p>Active deception nodes, trap sessions, and attacker activity command logs.</p>
+          <h1>Honeypot markazi</h1>
+          <p>Tirik dekoylar tutgan hujum urinishlari. Oxirgi 24 soatdagi faollik Exposure’da aynan shu xizmatning riskini oshiradi.</p>
         </div>
         <button className="refresh" onClick={load} disabled={loading}>
-          <RefreshCw size={14} className={loading ? 'animate-spin' : ''} /> Refresh Traps
+          <RefreshCw size={14} className={loading ? 'animate-spin' : ''} /> Yangilash
         </button>
       </div>
 
       {error && <div className="api-warning">API Warning: {error}</div>}
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 16, marginBottom: 20 }}>
-        <div className="panel" style={{ padding: 16 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '11px', color: '#688290' }}>SSH DECOY NODE</span>
-            <span style={{ fontSize: '10px', color: '#00e5ff', background: '#00e5ff12', padding: '2px 6px', borderRadius: 4 }}>ONLINE</span>
-          </div>
-          <h3 style={{ margin: '8px 0 4px', fontSize: '15px' }}>decoy-ssh-vault</h3>
-          <p style={{ fontSize: '11px', color: '#688290', margin: 0 }}>IP: 10.0.0.99 (Traps unauthorized SSH attempts)</p>
-        </div>
+      <div className="stat-grid" style={{ marginBottom: 18 }}>
+        <div className="stat-card"><div className="stat-label"><Crosshair size={14} /> Tutilgan sessiyalar</div><strong>{sessions.length}</strong><small>Jami qayd etilgan hujum urinishlari</small></div>
+        <div className="stat-card"><div className="stat-label"><Users size={14} /> Noyob hujumchilar</div><strong>{stats.uniqueIps}</strong><small>Turli manba IP manzillari</small></div>
+        <div className="stat-card"><div className="stat-label"><Flame size={14} /> Hujumdagi xizmatlar</div><strong>{stats.services}</strong><small>Hit olgan dekoy xizmatlar</small></div>
+        <div className="stat-card"><div className="stat-label"><ShieldAlert size={14} /> Eng yuqori risk</div><strong>{stats.maxRisk}/100</strong><small>Eng xavfli sessiya bahosi</small></div>
+      </div>
 
-        <div className="panel" style={{ padding: 16 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '11px', color: '#688290' }}>FAKE WEB PANEL</span>
-            <span style={{ fontSize: '10px', color: '#00e5ff', background: '#00e5ff12', padding: '2px 6px', borderRadius: 4 }}>ONLINE</span>
-          </div>
-          <h3 style={{ margin: '8px 0 4px', fontSize: '15px' }}>fake-admin-portal</h3>
-          <p style={{ fontSize: '11px', color: '#688290', margin: 0 }}>IP: 10.0.0.50/admin (Logs fake credential logins)</p>
+      <div className="panel" style={{ padding: 20, marginBottom: 18 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+          <Flame size={16} style={{ color: 'var(--red)' }} />
+          <b style={{ fontSize: 15 }}>Faol hujum (oxirgi 24 soat)</b>
         </div>
-
-        <div className="panel" style={{ padding: 16 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '11px', color: '#688290' }}>DECOY SECRETS FILE</span>
-            <span style={{ fontSize: '10px', color: '#ffb703', background: '#ffb70312', padding: '2px 6px', borderRadius: 4 }}>TRAPPED</span>
+        {stats.activeServices.length === 0 ? (
+          <p style={{ margin: 0, color: '#688290', fontSize: 13 }}>Oxirgi 24 soatda dekoylarga hujum qayd etilmadi.</p>
+        ) : (
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {stats.activeServices.map((svc) => (
+              <span key={svc} className="soon-badge" style={{ color: '#fff', background: 'var(--red)', borderColor: 'var(--red)' }}>⚡ {svc}</span>
+            ))}
           </div>
-          <h3 style={{ margin: '8px 0 4px', fontSize: '15px' }}>/var/www/.env.honeypot</h3>
-          <p style={{ fontSize: '11px', color: '#688290', margin: 0 }}>Fake credentials seed for tracking lateral movement</p>
-        </div>
+        )}
+        <small style={{ display: 'block', marginTop: 10, color: '#688290' }}>
+          Bu xizmatlardagi exposure’lar Exposure ekranida “FAOL HUJUM” sifatida belgilanadi va risk skori oshiriladi.
+        </small>
       </div>
 
       <div className="panel table-panel">
         <div className="table-meta">
-          <span>{loading ? 'Loading honeypot sessions...' : `${sessions.length} trapped sessions`}</span>
-          <span>Deception Telemetry Stream</span>
+          <span>{loading ? 'Yuklanmoqda…' : `${sessions.length} ta tutilgan sessiya`}</span>
+          <span>Deception telemetriya oqimi</span>
         </div>
         <div className="table-scroll">
           <table>
             <thead>
               <tr>
-                <th>Attacker IP</th>
-                <th>Target Service</th>
-                <th>Attempted Credentials</th>
-                <th>Commands Executed</th>
-                <th>Files Accessed</th>
-                <th>Duration</th>
-                <th>Risk Score</th>
+                <th>Hujumchi IP</th>
+                <th>Xizmat</th>
+                <th>Urinilgan parollar</th>
+                <th>Qayd etilgan kirish</th>
+                <th>Davomiylik</th>
+                <th>Risk</th>
               </tr>
             </thead>
             <tbody>
@@ -88,7 +99,7 @@ export default function HoneypotsPage() {
                 <tr key={s.session_id}>
                   <td className="mono">
                     <b style={{ color: '#ff4a4a' }}>{s.attacker_ip}</b>
-                    <small>{s.session_id}</small>
+                    <small>{s.session_id.slice(0, 18)}</small>
                   </td>
                   <td>
                     <b>{s.service}</b>
@@ -96,6 +107,7 @@ export default function HoneypotsPage() {
                   </td>
                   <td>
                     <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                      {s.credentials_attempted.length === 0 && <span className="mono" style={{ fontSize: 10, color: '#688290' }}>—</span>}
                       {s.credentials_attempted.map((c, i) => (
                         <span key={i} className="mono" style={{ background: '#05090d', border: '1px solid #1c2e39', padding: '1px 5px', borderRadius: 3, fontSize: '10px' }}>
                           {c}
@@ -106,11 +118,9 @@ export default function HoneypotsPage() {
                   <td>
                     <div className="mono" style={{ fontSize: '11px', color: '#00e5ff' }}>
                       {s.commands_executed.slice(0, 3).join('; ')}
-                      {s.commands_executed.length > 3 && '...'}
+                      {s.commands_executed.length > 3 && '…'}
+                      {s.commands_executed.length === 0 && <span style={{ color: '#688290' }}>—</span>}
                     </div>
-                  </td>
-                  <td className="mono" style={{ fontSize: '11px' }}>
-                    {s.files_accessed.join(', ') || 'None'}
                   </td>
                   <td className="mono">{s.duration_seconds}s</td>
                   <td>
@@ -120,8 +130,8 @@ export default function HoneypotsPage() {
               ))}
               {!loading && sessions.length === 0 && (
                 <tr>
-                  <td colSpan={7}>
-                    <div className="empty">No honeypot sessions recorded yet. Run an attack simulation to trigger honeypot traps.</div>
+                  <td colSpan={6}>
+                    <div className="empty">Hali honeypot sessiyasi yo‘q. Dekoyni ishga tushiring (docker compose --profile honeypot up) yoki hujum simulyatsiyasini bajaring.</div>
                   </td>
                 </tr>
               )}
