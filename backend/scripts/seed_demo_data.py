@@ -24,14 +24,19 @@ import argparse
 import asyncio
 import sys
 
+from datetime import datetime, timezone
+
 from sqlalchemy import delete
 
 from core.config import get_settings
 from db.models.agent import AgentModel
+from db.models.honeypot import HoneypotSessionModel
 from db.models.vulnerability import AssetVulnerabilityModel
 from db.repositories.agent_repository import PostgresAgentRepository
+from db.repositories.honeypot_repository import PostgresHoneypotRepository
 from db.repositories.vulnerability_repository import PostgresVulnerabilityRepository
 from db.session import DatabaseSessionManager
+from honeypot.signal import active_service_categories
 from vulnerabilities.service import VulnerabilityService
 
 # ── Demo assets ──────────────────────────────────────────────────────────────
@@ -109,8 +114,11 @@ async def _reset(mgr: DatabaseSessionManager) -> None:
             model = await session.get(AgentModel, aid)
             if model is not None:
                 await session.delete(model)
+        hp = await session.get(HoneypotSessionModel, "demo-hp-web-01")
+        if hp is not None:
+            await session.delete(hp)
         await session.commit()
-    print("Removed demo assets and their exposures (shared CVE catalog left intact).")
+    print("Removed demo assets, exposures and the demo honeypot session (shared CVE catalog left intact).")
 
 
 async def _seed(mgr: DatabaseSessionManager) -> None:
@@ -137,11 +145,29 @@ async def _seed(mgr: DatabaseSessionManager) -> None:
             epss_map[v["cve_id"]] = v["epss"]
         await vuln_repo.set_epss_scores(epss_map)
 
+        # A live honeypot hit on a WEB decoy — the local real-time attack signal.
+        honeypot_repo = PostgresHoneypotRepository(session)
+        await honeypot_repo.add_session({
+            "session_id": "demo-hp-web-01",
+            "attacker_ip": "203.0.113.66",
+            "service": "Fake Web Panel",
+            "started_at": datetime.now(timezone.utc),
+            "duration_seconds": 42,
+            "credentials_attempted": ["admin:admin", "root:toor"],
+            "commands_executed": ["GET /admin", "POST /login"],
+            "risk_score": 80,
+            "notes": "Demo: attacker probing a web decoy.",
+        })
+        active_threat_services = active_service_categories(
+            await honeypot_repo.recent_sessions(within_hours=24), within_hours=24
+        )
+
         total = 0
         for asset in ASSETS:
             exposures = await service.evaluate_agent(
                 agent_id=asset["agent_id"], asset_risk_score=asset["risk_score"],
                 internet_exposed=asset["internet_exposed"], criticality=asset["criticality"],
+                active_threat_services=active_threat_services,
             )
             total += len(exposures)
 
@@ -149,13 +175,15 @@ async def _seed(mgr: DatabaseSessionManager) -> None:
 
     print(f"Seeded {len(ASSETS)} assets, {len(VULNS)} CVEs, {total} exposures.\n")
     print("Prioritized exposures (what the Exposure view shows):")
-    print(f"{'#':<3}{'RISK':<9}{'ASSET':<14}{'CVE':<24}{'SEV':<10}{'CVSS':<6}{'EPSS':<8}{'KEV':<5}")
-    print("-" * 82)
+    print(f"{'#':<3}{'RISK':<9}{'ASSET':<14}{'CVE':<24}{'SEV':<10}{'CVSS':<6}{'EPSS':<8}{'KEV':<5}{'ATTACK':<8}")
+    print("-" * 92)
     for i, (exp, vuln) in enumerate(rows, 1):
         epss = f"{(vuln.epss_score or 0) * 100:.1f}%"
         print(f"{i:<3}{str(exp.risk_score) + '/100':<9}{exp.agent_id:<14}{exp.cve_id:<24}"
-              f"{vuln.severity:<10}{str(vuln.cvss_score):<6}{epss:<8}{'YES' if vuln.known_exploited else 'no':<5}")
+              f"{vuln.severity:<10}{str(vuln.cvss_score):<6}{epss:<8}{'YES' if vuln.known_exploited else 'no':<5}"
+              f"{'LIVE' if exp.active_threat else '-':<8}")
     print("\nNote: EPSS values are a static demo snapshot, not live FIRST.org data.")
+    print("ATTACK=LIVE means a honeypot saw a live attack on that service (local signal).")
 
 
 async def main() -> None:

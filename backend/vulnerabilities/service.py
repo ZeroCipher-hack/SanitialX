@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 
 from db.models.vulnerability import AssetVulnerabilityModel, VulnerabilityModel
 from db.repositories.vulnerability_repository import PostgresVulnerabilityRepository
+from honeypot.signal import software_categories
 from vulnerabilities.matcher import match_software_to_rule
 
 
@@ -77,8 +78,15 @@ class VulnerabilityService:
         asset_risk_score: int = 0,
         internet_exposed: bool = False,
         criticality: str | None = None,
+        active_threat_services: set[str] | None = None,
     ) -> list[AssetVulnerabilityModel]:
-        """Match an asset inventory against stored affected-product rules."""
+        """Match an asset inventory against stored affected-product rules.
+
+        ``active_threat_services`` are service categories under active attack
+        right now (derived from recent honeypot activity). An exposure whose
+        software falls in one of them is flagged and its risk boosted.
+        """
+        active_threat_services = active_threat_services or set()
         inventory = await self._repository.list_software_inventory(agent_id)
         vulnerabilities = await self._repository.list_all_vulnerabilities()
         exposures: list[AssetVulnerabilityModel] = []
@@ -107,6 +115,15 @@ class VulnerabilityService:
                 continue
 
             confidence, software, rationale = best_match
+            active_threat = bool(
+                active_threat_services
+                and software_categories(
+                    vendor=software.vendor,
+                    product=software.product,
+                    package_name=software.package_name,
+                )
+                & active_threat_services
+            )
             risk_score = self.calculate_risk_score(
                 cvss_score=vuln.cvss_score,
                 known_exploited=vuln.known_exploited,
@@ -115,6 +132,7 @@ class VulnerabilityService:
                 asset_risk_score=asset_risk_score,
                 criticality=criticality,
                 epss_score=vuln.epss_score,
+                active_threat=active_threat,
             )
             exposure = await self._repository.upsert_exposure(
                 {
@@ -124,6 +142,7 @@ class VulnerabilityService:
                     "match_confidence": confidence,
                     "risk_score": risk_score,
                     "internet_exposed": internet_exposed,
+                    "active_threat": active_threat,
                     "matched_software": {
                         "vendor": software.vendor,
                         "product": software.product,
@@ -153,6 +172,7 @@ class VulnerabilityService:
         asset_risk_score: int = 0,
         criticality: str | None = None,
         epss_score: float | None = None,
+        active_threat: bool = False,
     ) -> int:
         """Return a deterministic 0-100 exposure prioritization score.
 
@@ -164,6 +184,10 @@ class VulnerabilityService:
         CVSS alone over-ranks severe-but-never-exploited CVEs; EPSS folds in
         the likelihood of real-world exploitation. ``None`` is neutral so the
         score is unchanged when EPSS has not been synced yet.
+
+        ``active_threat`` is a local signal: recent honeypot activity targets
+        this exposure's service right now. It is the strongest "do this first"
+        nudge EPSS (a global estimate) cannot provide.
         """
         score = int((cvss_score or 0.0) * 6)
         if known_exploited:
@@ -176,6 +200,9 @@ class VulnerabilityService:
         if epss_score is not None:
             clamped_epss = min(max(epss_score, 0.0), 1.0)
             score += int(round(clamped_epss * 25))
+
+        if active_threat:
+            score += 15
 
         if criticality is not None:
             score += CRITICALITY_WEIGHTS.get(str(criticality).upper(), 0)

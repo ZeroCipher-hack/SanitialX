@@ -15,6 +15,7 @@ type Exposure = {
   match_confidence: number;
   risk_score: number;
   internet_exposed: boolean;
+  active_threat: boolean;
   matched_software: Record<string, unknown>;
   rationale: string;
   first_seen: string;
@@ -168,9 +169,10 @@ export default function ExposureCenter() {
                 <td className="mono">{x.cvss_score ?? '—'}</td>
                 <td className="mono" style={{ color: epssColor(x.epss_score), fontWeight: 600 }}>{fmtEpss(x.epss_score)}</td>
                 <td><div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  {x.active_threat && <span className="soon-badge" style={{ color: '#fff', background: 'var(--red)', borderColor: 'var(--red)' }}>⚡ FAOL HUJUM</span>}
                   {x.known_exploited && <span className="soon-badge" style={{ color: 'var(--red)' }}>CISA KEV</span>}
                   {x.exploit_available && <span className="soon-badge" style={{ color: 'var(--amber)' }}>EXPLOIT</span>}
-                  {!x.known_exploited && !x.exploit_available && <span className="mono">—</span>}
+                  {!x.known_exploited && !x.exploit_available && !x.active_threat && <span className="mono">—</span>}
                 </div></td>
                 <td><small>{x.status}</small></td>
                 <td><button className="refresh" onClick={(e) => { e.stopPropagation(); setSelected(x); setAiAnalysis(null); setAiError(''); }}>Ko‘rish</button></td>
@@ -201,6 +203,7 @@ export default function ExposureCenter() {
               <div className="modal-field"><label>CISA KEV</label><b style={{ color: selected.known_exploited ? 'var(--red)' : undefined }}>{selected.known_exploited ? 'HA — tabiatda ekspluatatsiya qilinmoqda' : 'Yo‘q'}</b></div>
               <div className="modal-field"><label>MATCH CONFIDENCE</label><b>{Math.round(selected.match_confidence * 100)}%</b></div>
               <div className="modal-field"><label>INTERNETGA OCHIQ</label><b>{selected.internet_exposed ? 'HA' : 'Yo‘q'}</b></div>
+              <div className="modal-field"><label>FAOL HUJUM (honeypot)</label><b style={{ color: selected.active_threat ? 'var(--red)' : undefined }}>{selected.active_threat ? 'HA — honeypot shu xizmatga hujumni qayd etdi' : 'Yo‘q'}</b></div>
               <div className="modal-field full"><label>CVE XULOSA</label><b>{selected.cve_summary}</b></div>
               <div className="modal-field full"><label>MOS KELISH SABABI</label><small>{selected.rationale || '—'}</small></div>
               <div className="modal-field full"><label>MOS DASTUR</label><pre className="modal-code">{JSON.stringify(selected.matched_software || {}, null, 2)}</pre></div>

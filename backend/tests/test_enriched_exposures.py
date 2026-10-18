@@ -75,3 +75,38 @@ async def test_list_enriched_exposures_respects_min_risk(session: AsyncSession) 
     rows = await repo.list_enriched_exposures(agent_id="agent-1", min_risk_score=70)
 
     assert [exp.cve_id for exp, _ in rows] == ["CVE-2026-0004"]
+
+
+@pytest.mark.asyncio
+async def test_evaluate_agent_flags_and_boosts_active_threat(session: AsyncSession) -> None:
+    from vulnerabilities.service import VulnerabilityService
+
+    repo = PostgresVulnerabilityRepository(session)
+    await repo.upsert_vulnerability({
+        "cve_id": "CVE-2021-44228",
+        "summary": "Log4Shell",
+        "cvss_score": 10.0,
+        "severity": "CRITICAL",
+        "affected_products": [{
+            "criteria": "cpe:2.3:a:apache:log4j:*:*:*:*:*:*:*:*",
+            "version_end_excluding": "2.15.0",
+        }],
+    })
+    await repo.replace_software_inventory("agent-1", [
+        {"vendor": "apache", "product": "log4j", "version": "2.14.1",
+         "cpe": "cpe:2.3:a:apache:log4j:2.14.1:*:*:*:*:*:*:*"},
+    ])
+    svc = VulnerabilityService(repo)
+
+    calm = await svc.evaluate_agent(agent_id="agent-1")
+    assert calm and calm[0].active_threat is False
+    calm_risk = calm[0].risk_score
+
+    # A honeypot hit on a WEB service (log4j is WEB) marks it an active threat.
+    hot = await svc.evaluate_agent(agent_id="agent-1", active_threat_services={"WEB"})
+    assert hot and hot[0].active_threat is True
+    assert hot[0].risk_score >= calm_risk
+
+    # An unrelated active service (SSH) does not flag a WEB exposure.
+    unrelated = await svc.evaluate_agent(agent_id="agent-1", active_threat_services={"SSH"})
+    assert unrelated and unrelated[0].active_threat is False

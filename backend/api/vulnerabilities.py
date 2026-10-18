@@ -13,7 +13,9 @@ from api.deps import get_current_user, get_db_session, require_role
 from core.config import get_settings
 from core.security import TokenPayload
 from db.repositories.agent_repository import PostgresAgentRepository
+from db.repositories.honeypot_repository import PostgresHoneypotRepository
 from db.repositories.vulnerability_repository import PostgresVulnerabilityRepository
+from honeypot.signal import active_service_categories
 from services.ai_vulnerability_analysis import (
     analyze_vulnerability,
     fallback_vulnerability_analysis,
@@ -54,6 +56,7 @@ def _exposure_to_dict(model) -> dict[str, Any]:
         "match_confidence": model.match_confidence,
         "risk_score": model.risk_score,
         "internet_exposed": model.internet_exposed,
+        "active_threat": model.active_threat,
         "matched_software": model.matched_software,
         "rationale": model.rationale,
         "first_seen": model.first_seen,
@@ -151,12 +154,17 @@ async def evaluate_agent_exposure(
     )
     criticality = str(agent.get("criticality") or "MEDIUM").upper()
 
+    # Local real-time signal: service categories a honeypot saw attacked recently.
+    honeypot_sessions = await PostgresHoneypotRepository(session).recent_sessions(within_hours=24)
+    active_threat_services = active_service_categories(honeypot_sessions, within_hours=24)
+
     service = VulnerabilityService(PostgresVulnerabilityRepository(session))
     exposures = await service.evaluate_agent(
         agent_id=agent_id,
         asset_risk_score=int(agent.get("risk_score") or 0),
         internet_exposed=effective_internet_exposed,
         criticality=criticality,
+        active_threat_services=active_threat_services,
     )
     return {
         "agent_id": agent_id,
