@@ -143,6 +143,29 @@ curl -X POST http://localhost:8000/api/v1/auth/token \
 
 Use the returned token as a Bearer token for protected endpoints.
 
+## Demo Data (Exposure view)
+
+To populate the Exposure view with realistic, prioritized data locally —
+without needing the external NVD/EPSS/CISA feeds reachable — seed synthetic
+demo assets, CVEs and exposures:
+
+```bash
+cd backend
+PYTHONPATH=. python -m scripts.seed_demo_data --confirm
+```
+
+This creates a few `demo-*` assets, a small CVE catalog (with CVSS, CISA KEV
+flags and a static representative EPSS snapshot) and matching software
+inventory, then runs the real exposure evaluation so exposures are ranked by
+`risk = CVSS × EPSS × KEV`. The EPSS values are a demo snapshot, not live
+FIRST.org data; a real deployment fills them from the vulnerability sync job.
+
+Remove the demo data with:
+
+```bash
+PYTHONPATH=. python -m scripts.seed_demo_data --reset
+```
+
 ## Final Docker Smoke Test
 
 After the stack is up and an analyst/admin operator exists, run the production-style smoke test from the repository root:
