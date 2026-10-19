@@ -16,6 +16,9 @@ type Exposure = {
   risk_score: number;
   internet_exposed: boolean;
   active_threat: boolean;
+  remediation_status: string;
+  remediation_note: string;
+  remediation_updated_by: string | null;
   matched_software: Record<string, unknown>;
   rationale: string;
   first_seen: string;
@@ -57,6 +60,22 @@ function epssColor(score: number | null) {
   return 'var(--muted)';
 }
 
+const REMEDIATION: { value: string; label: string; color: string }[] = [
+  { value: 'OPEN', label: 'Ochiq', color: 'var(--amber)' },
+  { value: 'IN_PROGRESS', label: 'Jarayonda', color: 'var(--cyan)' },
+  { value: 'RESOLVED', label: 'Hal qilindi', color: 'var(--cyan)' },
+  { value: 'RISK_ACCEPTED', label: 'Risk qabul qilindi', color: 'var(--muted)' },
+  { value: 'FALSE_POSITIVE', label: 'Noto‘g‘ri signal', color: 'var(--muted)' },
+];
+
+function remLabel(value: string): string {
+  return REMEDIATION.find((r) => r.value === value)?.label ?? value;
+}
+
+function remColor(value: string): string {
+  return REMEDIATION.find((r) => r.value === value)?.color ?? 'var(--muted)';
+}
+
 export default function ExposureCenter() {
   const [exposures, setExposures] = useState<Exposure[]>([]);
   const [selected, setSelected] = useState<Exposure | null>(null);
@@ -69,6 +88,9 @@ export default function ExposureCenter() {
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState('');
   const [aiAnalysis, setAiAnalysis] = useState<AIAnalysis | null>(null);
+  const [remNote, setRemNote] = useState('');
+  const [remSaving, setRemSaving] = useState(false);
+  const [remError, setRemError] = useState('');
 
   const load = async () => {
     setLoading(true); setError('');
@@ -82,6 +104,20 @@ export default function ExposureCenter() {
   };
 
   useEffect(() => { load(); }, []);
+
+  const handleRemediation = async (exposure: Exposure, status: string) => {
+    setRemSaving(true); setRemError('');
+    try {
+      const updated = await api<Exposure>(
+        `/vulnerabilities/exposures/${exposure.id}/remediation`,
+        { method: 'PATCH', body: JSON.stringify({ status, note: remNote }) },
+      );
+      setExposures((prev) => prev.map((x) => (x.id === exposure.id ? { ...x, ...updated } : x)));
+      setSelected((prev) => (prev && prev.id === exposure.id ? { ...prev, ...updated } : prev));
+    } catch (e: unknown) {
+      setRemError(e instanceof Error ? e.message : 'Remediation holatini saqlab bo‘lmadi.');
+    } finally { setRemSaving(false); }
+  };
 
   const handleAIAnalyze = async (exposure: Exposure) => {
     setAiLoading(true); setAiError(''); setAiAnalysis(null);
@@ -160,7 +196,7 @@ export default function ExposureCenter() {
           </tr></thead>
           <tbody>
             {filtered.map((x, index) => (
-              <tr key={x.id} style={{ cursor: 'pointer' }} onClick={() => { setSelected(x); setAiAnalysis(null); setAiError(''); }}>
+              <tr key={x.id} style={{ cursor: 'pointer' }} onClick={() => { setSelected(x); setAiAnalysis(null); setAiError(''); setRemNote(x.remediation_note || ''); setRemError(''); }}>
                 <td className="mono">{index + 1}</td>
                 <td><span className={`badge ${riskClass(x.risk_score)}`}>{x.risk_score}/100</span></td>
                 <td><b>{x.agent_id}</b>{x.internet_exposed && <small style={{ color: 'var(--amber)' }}>internetga ochiq</small>}</td>
@@ -174,8 +210,8 @@ export default function ExposureCenter() {
                   {x.exploit_available && <span className="soon-badge" style={{ color: 'var(--amber)' }}>EXPLOIT</span>}
                   {!x.known_exploited && !x.exploit_available && !x.active_threat && <span className="mono">—</span>}
                 </div></td>
-                <td><small>{x.status}</small></td>
-                <td><button className="refresh" onClick={(e) => { e.stopPropagation(); setSelected(x); setAiAnalysis(null); setAiError(''); }}>Ko‘rish</button></td>
+                <td><small>{x.status}</small><small style={{ color: remColor(x.remediation_status), fontWeight: 600 }}>{remLabel(x.remediation_status)}</small></td>
+                <td><button className="refresh" onClick={(e) => { e.stopPropagation(); setSelected(x); setAiAnalysis(null); setAiError(''); setRemNote(x.remediation_note || ''); setRemError(''); }}>Ko‘rish</button></td>
               </tr>
             ))}
             {!loading && filtered.length === 0 && (
@@ -207,6 +243,38 @@ export default function ExposureCenter() {
               <div className="modal-field full"><label>CVE XULOSA</label><b>{selected.cve_summary}</b></div>
               <div className="modal-field full"><label>MOS KELISH SABABI</label><small>{selected.rationale || '—'}</small></div>
               <div className="modal-field full"><label>MOS DASTUR</label><pre className="modal-code">{JSON.stringify(selected.matched_software || {}, null, 2)}</pre></div>
+
+              <div className="modal-field full">
+                <label>REMEDIATION HOLATI</label>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
+                  {REMEDIATION.map((r) => (
+                    <button
+                      key={r.value}
+                      className="refresh"
+                      disabled={remSaving}
+                      onClick={() => handleRemediation(selected, r.value)}
+                      style={selected.remediation_status === r.value
+                        ? { borderColor: r.color, color: r.color, fontWeight: 600 }
+                        : undefined}
+                    >
+                      {selected.remediation_status === r.value ? '✓ ' : ''}{r.label}
+                    </button>
+                  ))}
+                </div>
+                <textarea
+                  value={remNote}
+                  onChange={(e) => setRemNote(e.target.value)}
+                  placeholder="Izoh (ixtiyoriy) — masalan: patch rejalashtirildi, yoki biznes risk qabul qildi"
+                  rows={2}
+                  style={{ width: '100%', marginTop: 10, background: '#05090d', color: 'var(--text, #E9EFF7)', border: '1px solid #28374F', borderRadius: 8, padding: 10, fontSize: 14, fontFamily: 'inherit' }}
+                />
+                {selected.remediation_updated_by && (
+                  <small style={{ display: 'block', marginTop: 6, color: 'var(--muted)' }}>
+                    Oxirgi o‘zgartirgan: {selected.remediation_updated_by}
+                  </small>
+                )}
+                {remError && <div className="api-warning" style={{ marginTop: 8 }}>{remError}</div>}
+              </div>
 
               <div className="modal-field full">
                 <button className="demo-attack-btn" onClick={() => handleAIAnalyze(selected)} disabled={aiLoading}>

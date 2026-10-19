@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.deps import get_current_user, get_db_session, require_role
@@ -57,6 +58,10 @@ def _exposure_to_dict(model) -> dict[str, Any]:
         "risk_score": model.risk_score,
         "internet_exposed": model.internet_exposed,
         "active_threat": model.active_threat,
+        "remediation_status": model.remediation_status,
+        "remediation_note": model.remediation_note,
+        "remediation_updated_by": model.remediation_updated_by,
+        "remediation_updated_at": model.remediation_updated_at,
         "matched_software": model.matched_software,
         "rationale": model.rationale,
         "first_seen": model.first_seen,
@@ -122,6 +127,32 @@ async def list_exposures(
         offset=offset,
     )
     return [_enriched_exposure_to_dict(exposure, vuln) for exposure, vuln in rows]
+
+
+class RemediationUpdate(BaseModel):
+    """Analyst decision on what to do about an exposure."""
+
+    status: Literal["OPEN", "IN_PROGRESS", "RESOLVED", "RISK_ACCEPTED", "FALSE_POSITIVE"]
+    note: str = Field(default="", max_length=2000)
+
+
+@router.patch("/exposures/{exposure_id}/remediation")
+async def update_exposure_remediation(
+    exposure_id: int,
+    payload: RemediationUpdate,
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+    user: Annotated[TokenPayload, Depends(require_role(["admin", "analyst"]))],
+) -> dict[str, Any]:
+    """Set an exposure's remediation state (open / in progress / resolved /
+    risk accepted / false positive). This turns the view from a list of
+    problems into a tracked workflow."""
+    repo = PostgresVulnerabilityRepository(session)
+    model = await repo.set_remediation(
+        exposure_id, status=payload.status, note=payload.note, actor=user.sub
+    )
+    if model is None:
+        raise HTTPException(status_code=404, detail="Exposure not found.")
+    return _exposure_to_dict(model)
 
 
 @router.post("/sync")

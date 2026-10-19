@@ -110,3 +110,41 @@ async def test_evaluate_agent_flags_and_boosts_active_threat(session: AsyncSessi
     # An unrelated active service (SSH) does not flag a WEB exposure.
     unrelated = await svc.evaluate_agent(agent_id="agent-1", active_threat_services={"SSH"})
     assert unrelated and unrelated[0].active_threat is False
+
+
+@pytest.mark.asyncio
+async def test_remediation_status_set_and_preserved(session: AsyncSession) -> None:
+    from vulnerabilities.service import VulnerabilityService
+
+    repo = PostgresVulnerabilityRepository(session)
+    await repo.upsert_vulnerability({
+        "cve_id": "CVE-2021-44228", "summary": "Log4Shell", "cvss_score": 10.0,
+        "severity": "CRITICAL",
+        "affected_products": [{"criteria": "cpe:2.3:a:apache:log4j:*:*:*:*:*:*:*:*",
+                               "version_end_excluding": "2.15.0"}],
+    })
+    await repo.replace_software_inventory("agent-1", [
+        {"vendor": "apache", "product": "log4j", "version": "2.14.1",
+         "cpe": "cpe:2.3:a:apache:log4j:2.14.1:*:*:*:*:*:*:*"},
+    ])
+    svc = VulnerabilityService(repo)
+    exposures = await svc.evaluate_agent(agent_id="agent-1")
+    exp = exposures[0]
+    assert exp.remediation_status == "OPEN"  # default
+
+    updated = await repo.set_remediation(exp.id, status="RISK_ACCEPTED", note="accepted by sec lead", actor="analyst-jane")
+    assert updated is not None
+    assert updated.remediation_status == "RISK_ACCEPTED"
+    assert updated.remediation_updated_by == "analyst-jane"
+    assert updated.remediation_updated_at is not None
+
+    # Re-evaluating the asset must NOT reset the remediation decision.
+    again = await svc.evaluate_agent(agent_id="agent-1")
+    assert again[0].remediation_status == "RISK_ACCEPTED"
+    assert again[0].remediation_note == "accepted by sec lead"
+
+
+@pytest.mark.asyncio
+async def test_set_remediation_missing_exposure_returns_none(session: AsyncSession) -> None:
+    repo = PostgresVulnerabilityRepository(session)
+    assert await repo.set_remediation(999999, status="RESOLVED", note="", actor="x") is None
