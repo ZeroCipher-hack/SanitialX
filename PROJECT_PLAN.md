@@ -1,4 +1,4 @@
-# SentinelX Project Plan
+# SanitialX Project Plan
 
 ## Phases
 1. **Repository cleanup, architecture docs**

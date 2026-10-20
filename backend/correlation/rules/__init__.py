@@ -1,1 +1,1 @@
-# SentinelX Detection Rules Package
+# SanitialX Detection Rules Package

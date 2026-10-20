@@ -1,5 +1,5 @@
 """
-Normalizer registry for SentinelX.
+Normalizer registry for SanitialX.
 
 Maintains an ordered list of :class:`BaseNormalizer` instances and provides
 lookup by :class:`RawEvent`.  Not a module-level singleton — must be

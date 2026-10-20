@@ -6,7 +6,12 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from db.repositories.vulnerability_repository import PostgresVulnerabilityRepository
-from vulnerabilities.feeds import CisaKevFeedClient, NvdFeedClient, parse_nvd_item
+from vulnerabilities.feeds import (
+    CisaKevFeedClient,
+    EpssFeedClient,
+    NvdFeedClient,
+    parse_nvd_item,
+)
 
 
 class VulnerabilitySyncService:
@@ -16,10 +21,12 @@ class VulnerabilitySyncService:
         *,
         nvd_client: NvdFeedClient | None = None,
         kev_client: CisaKevFeedClient | None = None,
+        epss_client: EpssFeedClient | None = None,
     ) -> None:
         self._repository = repository
         self._nvd = nvd_client or NvdFeedClient()
         self._kev = kev_client or CisaKevFeedClient()
+        self._epss = epss_client or EpssFeedClient()
 
     async def sync_recent(
         self,
@@ -53,6 +60,7 @@ class VulnerabilitySyncService:
         start_index = 0
         pages = 0
         total_results = 0
+        ingested_cve_ids: set[str] = set()
 
         try:
             while pages < max_pages:
@@ -71,6 +79,7 @@ class VulnerabilitySyncService:
                         continue
                     await self._repository.upsert_vulnerability(parsed)
                     ingested += 1
+                    ingested_cve_ids.add(parsed["cve_id"])
 
                 pages += 1
                 returned = len(items)
@@ -81,6 +90,28 @@ class VulnerabilitySyncService:
             kev_catalog = await self._kev.fetch_catalog()
             kev_ids = self._kev.cve_ids(kev_catalog)
             marked_kev = await self._repository.mark_known_exploited(kev_ids)
+
+            # EPSS enrichment is best-effort: a failure here must not invalidate
+            # the NVD/KEV sync that already succeeded.
+            epss_updated = 0
+            try:
+                if ingested_cve_ids:
+                    epss_scores = await self._epss.fetch_scores(sorted(ingested_cve_ids))
+                    epss_updated = await self._repository.set_epss_scores(epss_scores)
+                    await self._repository.upsert_sync_state(
+                        feed="epss",
+                        last_attempt_at=now,
+                        last_success_at=now,
+                        last_error=None,
+                        records_processed=epss_updated,
+                    )
+            except Exception as exc:  # noqa: BLE001 - enrichment is non-fatal
+                await self._repository.upsert_sync_state(
+                    feed="epss",
+                    last_attempt_at=now,
+                    last_error=f"{type(exc).__name__}: {exc}",
+                    records_processed=epss_updated,
+                )
 
             await self._repository.upsert_sync_state(
                 feed="nvd",
@@ -115,5 +146,6 @@ class VulnerabilitySyncService:
             "nvd_records_processed": ingested,
             "kev_catalog_size": len(kev_ids),
             "stored_records_marked_known_exploited": marked_kev,
+            "epss_records_updated": epss_updated,
             "last_success_at": now,
         }

@@ -23,7 +23,7 @@ class CorrelationWorker:
         subscriber: EventSubscriber,
         engine: CorrelationEngine,
         incident_service: IncidentService,
-        consumer_group: str = "sentinelx-consumers",
+        consumer_group: str = "sanitialx-consumers",
         consumer_name: str = "correlation-worker-1",
         event_persist_hook: Callable[[Any], Awaitable[bool]] | None = None,
         post_event_hook: Callable[[Any], Awaitable[int]] | None = None,

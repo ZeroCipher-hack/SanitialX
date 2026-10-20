@@ -1,5 +1,5 @@
 """
-Health endpoints for SentinelX.
+Health endpoints for SanitialX.
 
 Architecture Invariants:
 - /health: liveness check only — MUST NOT perform Redis or Postgres calls. Completely unauthenticated for orchestrators/load balancers.
@@ -27,7 +27,7 @@ async def liveness_check(request: Request) -> HealthResponse:
     return HealthResponse(
         status="ok",
         is_ready=getattr(request.app.state, "is_ready", False),
-        details={"service": "SentinelX Backend"},
+        details={"service": "SanitialX Backend"},
     )
 
 

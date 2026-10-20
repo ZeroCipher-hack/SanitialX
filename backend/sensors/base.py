@@ -1,5 +1,5 @@
 """
-Sensor abstraction layer for SentinelX.
+Sensor abstraction layer for SanitialX.
 
 Defines :class:`BaseSensor` (the single canonical sensor interface) and
 the :class:`RawEvent` type that sensors produce.
@@ -36,7 +36,7 @@ RawEventCallback = Callable[[RawEvent], Coroutine[Any, Any, None]]
 
 
 class BaseSensor(abc.ABC):
-    """Abstract base class for all SentinelX sensors.
+    """Abstract base class for all SanitialX sensors.
 
     Subclasses must implement ``start``, ``stop``, and ``is_running``.
     When a sensor captures data, it must invoke the registered callback

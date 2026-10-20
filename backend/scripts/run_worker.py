@@ -1,5 +1,5 @@
 """
-Standalone entrypoint for the SentinelX correlation worker container.
+Standalone entrypoint for the SanitialX correlation worker container.
 
 Mirrors the relevant parts of core/lifecycle.py's startup sequence: a bare
 ApplicationContainer has no event bus attached (event_bus stays None), so
@@ -20,7 +20,7 @@ from core.container import ApplicationContainer
 from event_bus.redis_bus import RedisEventBus
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("sentinelx.worker")
+logger = logging.getLogger("sanitialx.worker")
 
 
 async def main() -> None:

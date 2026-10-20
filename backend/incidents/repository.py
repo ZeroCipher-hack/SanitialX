@@ -1,5 +1,5 @@
 """
-IncidentRepository abstraction for SentinelX.
+IncidentRepository abstraction for SanitialX.
 
 Defines the contract for persistent storage of Incidents.
 Must enforce optimistic concurrency control on update (raise IncidentConflictError
