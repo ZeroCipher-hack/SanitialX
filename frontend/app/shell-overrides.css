@@ -7,6 +7,13 @@ html,body{overflow-x:hidden}
 .sidebar .nav-item{font-size:14px;min-height:42px;padding:10px 12px;white-space:nowrap}
 .sidebar .nav-item svg{width:18px;height:18px;flex:0 0 auto}
 .sidebar .nav-group-title{font-size:10px;padding-top:15px;color:#58717d;font-weight:600}
+/* "Ko'proq" collapse toggle — styled as a nav-item but reset from <button> defaults */
+.sidebar .nav-more-toggle{width:100%;background:transparent;border:1px solid transparent;cursor:pointer;font-family:inherit;text-align:left;margin-top:8px;color:#889ca8}
+.sidebar .nav-more-toggle:hover{background:#0a1722;color:#00e5ff}
+.sidebar .nav-more-chevron{transition:transform .18s ease}
+.sidebar .nav-more-toggle.open .nav-more-chevron{transform:rotate(90deg)}
+.sidebar .nav-more{animation:navMoreIn .18s ease}
+@keyframes navMoreIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:translateY(0)}}
 .sidebar-footer{flex:0 0 auto;padding-top:10px;border-top:1px solid var(--border);margin-top:8px;background:#070b11}
 .logout-btn{display:flex;align-items:center;gap:8px;width:100%;justify-content:center;font-size:11px;padding:9px}
 
