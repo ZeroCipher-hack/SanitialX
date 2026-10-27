@@ -1,5 +1,5 @@
 """
-Sensor manager for SentinelX.
+Sensor manager for SanitialX.
 
 Manages the lifecycle of multiple :class:`BaseSensor` instances.
 No module-level mutable singletons — the manager must be instantiated

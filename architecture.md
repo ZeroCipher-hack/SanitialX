@@ -1,7 +1,7 @@
-# SentinelX Architecture
+# SanitialX Architecture
 
 ## Overview
-SentinelX is a modular, production-grade security monitoring backend (SIEM-style) designed for robust event collection, normalization, correlation, and incident management. It is built on strict Clean Architecture, SOLID, and dependency inversion principles, with strong boundaries between domain, application, and infrastructure layers.
+SanitialX is a modular, production-grade security monitoring backend (SIEM-style) designed for robust event collection, normalization, correlation, and incident management. It is built on strict Clean Architecture, SOLID, and dependency inversion principles, with strong boundaries between domain, application, and infrastructure layers.
 
 ## Key Principles
 - SOLID, Clean Architecture, Dependency Injection
@@ -62,7 +62,7 @@ SentinelX is a modular, production-grade security monitoring backend (SIEM-style
 5. **Incident Lost-Update Protection**
    - Incident updates must be protected against concurrent lost-update races. The architecture must use optimistic concurrency/versioning for persistent Incident updates. Example conceptual rule:
      - UPDATE incident SET ..., version = version + 1 WHERE id = :id AND version = :expected_version
-     - If the version no longer matches, the update must fail cleanly and the service must handle the conflict explicitly. Do not solve this with an in-memory lock because SentinelX must eventually support multiple application processes.
+     - If the version no longer matches, the update must fail cleanly and the service must handle the conflict explicitly. Do not solve this with an in-memory lock because SanitialX must eventually support multiple application processes.
 
 6. **Incident State Transitions Belong to the Service**
    - Incident state transitions are domain operations controlled by IncidentService. API routers must NOT directly mutate incident status. The flow must be: API → IncidentService → Repository → PostgreSQL, not: API → Incident object mutation → Repository. Allowed transitions must be validated by the service/domain rules.

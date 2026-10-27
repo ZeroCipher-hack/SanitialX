@@ -12,7 +12,7 @@ from datetime import datetime, timezone
 
 import fakeredis.aioredis
 import pytest
-from async_asgi_testclient import TestClient
+import httpx
 
 from auth.models import User
 from core.config import Settings
@@ -60,7 +60,8 @@ async def client():
         )
     )
 
-    async with TestClient(app) as test_client:
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as test_client:
         yield test_client
 
     await container.redis_client.aclose()
@@ -69,7 +70,7 @@ async def client():
 
 class TestAuthTokenEndpoint:
     @pytest.mark.asyncio
-    async def test_correct_credentials_issue_token_with_stored_role(self, client: TestClient) -> None:
+    async def test_correct_credentials_issue_token_with_stored_role(self, client: httpx.AsyncClient) -> None:
         resp = await client.post(
             "/api/v1/auth/token",
             json={"username": "analyst_jane", "password": "correct-horse-battery-staple"},
@@ -80,7 +81,7 @@ class TestAuthTokenEndpoint:
         assert isinstance(body["access_token"], str) and body["access_token"]
 
     @pytest.mark.asyncio
-    async def test_wrong_password_rejected(self, client: TestClient) -> None:
+    async def test_wrong_password_rejected(self, client: httpx.AsyncClient) -> None:
         resp = await client.post(
             "/api/v1/auth/token",
             json={"username": "analyst_jane", "password": "totally-wrong"},
@@ -88,7 +89,7 @@ class TestAuthTokenEndpoint:
         assert resp.status_code == 401
 
     @pytest.mark.asyncio
-    async def test_unknown_username_rejected(self, client: TestClient) -> None:
+    async def test_unknown_username_rejected(self, client: httpx.AsyncClient) -> None:
         resp = await client.post(
             "/api/v1/auth/token",
             json={"username": "nobody", "password": "anything"},
@@ -96,7 +97,7 @@ class TestAuthTokenEndpoint:
         assert resp.status_code == 401
 
     @pytest.mark.asyncio
-    async def test_client_cannot_self_escalate_role(self, client: TestClient) -> None:
+    async def test_client_cannot_self_escalate_role(self, client: httpx.AsyncClient) -> None:
         """The stored user is 'analyst' — extra client-supplied role claims,
         if sent, must never influence the issued token's role."""
         resp = await client.post(
@@ -111,7 +112,7 @@ class TestAuthTokenEndpoint:
         assert resp.json()["role"] == "analyst"
 
     @pytest.mark.asyncio
-    async def test_inactive_user_rejected(self, client: TestClient) -> None:
+    async def test_inactive_user_rejected(self, client: httpx.AsyncClient) -> None:
         container: ApplicationContainer = app.state.container
         await container.user_repository.create(
             User(
@@ -130,7 +131,7 @@ class TestAuthTokenEndpoint:
         assert resp.status_code == 401
 
     @pytest.mark.asyncio
-    async def test_sixth_attempt_in_window_is_rate_limited(self, client: TestClient) -> None:
+    async def test_sixth_attempt_in_window_is_rate_limited(self, client: httpx.AsyncClient) -> None:
         for _ in range(5):
             await client.post(
                 "/api/v1/auth/token",
@@ -143,7 +144,7 @@ class TestAuthTokenEndpoint:
         assert resp.status_code == 429
 
     @pytest.mark.asyncio
-    async def test_logout_revokes_token(self, client: TestClient) -> None:
+    async def test_logout_revokes_token(self, client: httpx.AsyncClient) -> None:
         login_resp = await client.post(
             "/api/v1/auth/token",
             json={"username": "analyst_jane", "password": "correct-horse-battery-staple"},

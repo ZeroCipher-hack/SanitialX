@@ -13,6 +13,7 @@ from api.health import router as health_router
 from api.incidents import router as incidents_router
 from api.rules import router as rules_router
 from api.events import router as events_router
+from api.logs import router as logs_router
 from api.agents import router as agents_router
 from api.honeypots import router as honeypots_router
 from api.simulations import router as simulations_router
@@ -29,6 +30,7 @@ api_v1_router.include_router(health_router)
 api_v1_router.include_router(incidents_router)
 api_v1_router.include_router(rules_router)
 api_v1_router.include_router(events_router)
+api_v1_router.include_router(logs_router)
 api_v1_router.include_router(agents_router)
 api_v1_router.include_router(honeypots_router)
 api_v1_router.include_router(simulations_router)

@@ -14,9 +14,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends libpq5 curl && 
 COPY --from=builder /opt/venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 ENV PYTHONPATH=/app
-RUN groupadd -g 1001 sentinelx && useradd -u 1001 -g sentinelx -s /bin/bash -m sentinelx
+RUN groupadd -g 1001 sanitialx && useradd -u 1001 -g sanitialx -s /bin/bash -m sanitialx
 COPY backend/ /app/
-RUN chown -R sentinelx:sentinelx /app
-USER sentinelx
+RUN chown -R sanitialx:sanitialx /app
+USER sanitialx
 EXPOSE 8000
 CMD ["uvicorn", "main:create_app", "--factory", "--host", "0.0.0.0", "--port", "8000"]

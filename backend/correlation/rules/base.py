@@ -1,5 +1,5 @@
 """
-DetectionRule abstraction for SentinelX.
+DetectionRule abstraction for SanitialX.
 
 Defines the single canonical interface for stateful correlation and detection rules.
 Rules evaluate NormalizedEvents and produce zero or more Detection objects.
@@ -15,7 +15,7 @@ from events.models import NormalizedEvent
 
 
 class DetectionRule(abc.ABC):
-    """Abstract base class for all detection rules in SentinelX.
+    """Abstract base class for all detection rules in SanitialX.
 
     Invariants:
     - Exactly ONE DetectionRule interface in the codebase.

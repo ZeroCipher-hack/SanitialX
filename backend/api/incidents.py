@@ -1,5 +1,5 @@
 """
-Incidents API router for SentinelX.
+Incidents API router for SanitialX.
 
 Endpoints:
 - GET /incidents (paginated, authenticated)

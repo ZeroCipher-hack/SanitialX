@@ -1,4 +1,4 @@
-# SentinelX — Modular Async SIEM Backend
+# SanitialX — Modular Async SIEM Backend
 
 [![Python](https://img.shields.io/badge/Python-3.x-blue?logo=python)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-async-green?logo=fastapi)](https://fastapi.tiangolo.com/)
@@ -6,11 +6,11 @@
 [![Redis](https://img.shields.io/badge/Redis-Streams-red?logo=redis)](https://redis.io/)
 [![Docker](https://img.shields.io/badge/Docker-Compose-blue?logo=docker)](https://www.docker.com/)
 
-**SentinelX** is a security-focused, async-first SIEM backend for ingesting network events, normalizing telemetry, correlating detections, and managing security incidents through a secured REST API.
+**SanitialX** is a security-focused, async-first SIEM backend for ingesting network events, normalizing telemetry, correlating detections, and managing security incidents through a secured REST API.
 
 > **Status:** Active development
 
-## Why SentinelX?
+## Why SanitialX?
 
 The project demonstrates a production-oriented security event pipeline rather than a simple packet sniffer:
 
@@ -142,6 +142,60 @@ curl -X POST http://localhost:8000/api/v1/auth/token \
 ```
 
 Use the returned token as a Bearer token for protected endpoints.
+
+## Demo Data (Exposure view)
+
+To populate the Exposure view with realistic, prioritized data locally —
+without needing the external NVD/EPSS/CISA feeds reachable — seed synthetic
+demo assets, CVEs and exposures:
+
+```bash
+cd backend
+PYTHONPATH=. python -m scripts.seed_demo_data --confirm
+```
+
+This creates a few `demo-*` assets, a small CVE catalog (with CVSS, CISA KEV
+flags and a static representative EPSS snapshot) and matching software
+inventory, then runs the real exposure evaluation so exposures are ranked by
+`risk = CVSS × EPSS × KEV`. The EPSS values are a demo snapshot, not live
+FIRST.org data; a real deployment fills them from the vulnerability sync job.
+
+Remove the demo data with:
+
+```bash
+PYTHONPATH=. python -m scripts.seed_demo_data --reset
+```
+
+## Honeypot Decoys (local attack signal)
+
+Low-interaction honeypot decoys bind ports, log attacker connection attempts
+(captured input is logged, never executed), and record each as a honeypot
+session. Those hits become a local "under active attack" signal that boosts
+the risk of exposures on the same service — something a global feed like EPSS
+cannot provide.
+
+Decoys are opt-in. Run them with Compose:
+
+```bash
+docker compose --profile honeypot up -d honeypot
+```
+
+Or standalone:
+
+```bash
+cd backend
+SANITIALX_HONEYPOT_ENABLED=true \
+SANITIALX_HONEYPOT_PORTS="2222:SSH,8080:Fake Web Panel,2323:Telnet" \
+PYTHONPATH=. python -m scripts.run_honeypot
+```
+
+An external decoy or agent can also report a hit directly:
+
+```bash
+curl -X POST http://localhost:8000/api/v1/honeypots/events \
+  -H "Authorization: Bearer <JWT_TOKEN>" -H "Content-Type: application/json" \
+  -d '{"attacker_ip":"203.0.113.10","service":"SSH"}'
+```
 
 ## Final Docker Smoke Test
 

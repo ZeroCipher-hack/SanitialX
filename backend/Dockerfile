@@ -31,13 +31,13 @@ ENV PATH="/opt/venv/bin:$PATH"
 ENV PYTHONPATH=/app
 
 # Create non-root user for security invariant compliance
-RUN groupadd -g 1001 sentinelx && \
-    useradd -u 1001 -g sentinelx -s /bin/bash -m sentinelx
+RUN groupadd -g 1001 sanitialx && \
+    useradd -u 1001 -g sanitialx -s /bin/bash -m sanitialx
 
 COPY . /app
-RUN chown -R sentinelx:sentinelx /app
+RUN chown -R sanitialx:sanitialx /app
 
-USER sentinelx
+USER sanitialx
 
 EXPOSE 8000
 

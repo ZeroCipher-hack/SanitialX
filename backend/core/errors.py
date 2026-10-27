@@ -1,7 +1,7 @@
 """
-SentinelX error hierarchy.
+SanitialX error hierarchy.
 
-All application-specific exceptions descend from :class:`SentinelXError`.
+All application-specific exceptions descend from :class:`SanitialXError`.
 This module is pure-domain — it must never import infrastructure packages
 (redis, fastapi, scapy, sqlalchemy, psycopg).
 """
@@ -9,25 +9,25 @@ This module is pure-domain — it must never import infrastructure packages
 from __future__ import annotations
 
 
-class SentinelXError(Exception):
-    """Root exception for the entire SentinelX application."""
+class SanitialXError(Exception):
+    """Root exception for the entire SanitialX application."""
 
 
 # ── Configuration Errors ─────────────────────────────────────────────────
 
-class ConfigurationError(SentinelXError):
+class ConfigurationError(SanitialXError):
     """Raised when application configuration is invalid or missing."""
 
 
 # ── Validation Errors ────────────────────────────────────────────────────
 
-class ValidationError(SentinelXError):
+class ValidationError(SanitialXError):
     """Raised when domain validation fails (distinct from Pydantic)."""
 
 
 # ── Sensor Errors ────────────────────────────────────────────────────────
 
-class SensorError(SentinelXError):
+class SensorError(SanitialXError):
     """Base class for sensor-related errors."""
 
 
@@ -41,7 +41,7 @@ class SensorStopError(SensorError):
 
 # ── Normalizer Errors ────────────────────────────────────────────────────
 
-class NormalizerError(SentinelXError):
+class NormalizerError(SanitialXError):
     """Base class for normalizer-related errors."""
 
 
@@ -51,19 +51,19 @@ class NormalizationError(NormalizerError):
 
 # ── Pipeline Errors ──────────────────────────────────────────────────────
 
-class PipelineError(SentinelXError):
+class PipelineError(SanitialXError):
     """Base class for pipeline-related errors."""
 
 
 # ── Correlation Errors (Phase 8+) ────────────────────────────────────────
 
-class CorrelationError(SentinelXError):
+class CorrelationError(SanitialXError):
     """Base class for correlation-related errors."""
 
 
 # ── Incident Errors (Phase 10+) ─────────────────────────────────────────
 
-class IncidentError(SentinelXError):
+class IncidentError(SanitialXError):
     """Base class for incident-related errors."""
 
 

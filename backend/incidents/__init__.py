@@ -1,1 +1,1 @@
-# SentinelX Incidents Package
+# SanitialX Incidents Package
