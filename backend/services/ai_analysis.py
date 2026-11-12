@@ -75,7 +75,7 @@ def analyze_incident(
     incident: Any,
     *,
     api_key: str,
-    model: str = "gemini-3-flash-preview",
+    model: str = "gemini-2.5-flash",
 ) -> AIIncidentAnalysis:
     """Run Gemini incident analysis with automatic model fallback.
 
@@ -89,8 +89,8 @@ def analyze_incident(
     candidate_models: list[str] = []
     for candidate in (
         model,
-        "gemini-3-flash-preview",
         "gemini-2.5-flash",
+        "gemini-2.0-flash",
     ):
         if candidate and candidate not in candidate_models:
             candidate_models.append(candidate)

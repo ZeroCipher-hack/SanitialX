@@ -1,1 +1,1 @@
-# SentinelX Events Package
+# SanitialX Events Package

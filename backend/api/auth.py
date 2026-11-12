@@ -1,5 +1,5 @@
 """
-Auth Router for SentinelX — JWT Token Generation.
+Auth Router for SanitialX — JWT Token Generation.
 
 Endpoints:
 - POST /api/v1/auth/token (Verifies credentials against stored, hashed

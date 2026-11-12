@@ -1,5 +1,5 @@
 """
-Canonical event model for SentinelX.
+Canonical event model for SanitialX.
 
 NormalizedEvent is the single, immutable, domain-level event representation.
 It is frozen (immutable), uses UTC-aware timestamps, and auto-generates

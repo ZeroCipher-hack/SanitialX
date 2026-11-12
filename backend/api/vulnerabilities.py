@@ -4,16 +4,19 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.deps import get_current_user, get_db_session, require_role
 from core.config import get_settings
 from core.security import TokenPayload
 from db.repositories.agent_repository import PostgresAgentRepository
+from db.repositories.honeypot_repository import PostgresHoneypotRepository
 from db.repositories.vulnerability_repository import PostgresVulnerabilityRepository
+from honeypot.signal import active_service_categories
 from services.ai_vulnerability_analysis import (
     analyze_vulnerability,
     fallback_vulnerability_analysis,
@@ -31,6 +34,8 @@ def _vulnerability_to_dict(model) -> dict[str, Any]:
         "cve_id": model.cve_id,
         "summary": model.summary,
         "cvss_score": model.cvss_score,
+        "epss_score": model.epss_score,
+        "epss_percentile": model.epss_percentile,
         "severity": model.severity,
         "published_at": model.published_at,
         "modified_at": model.modified_at,
@@ -52,6 +57,11 @@ def _exposure_to_dict(model) -> dict[str, Any]:
         "match_confidence": model.match_confidence,
         "risk_score": model.risk_score,
         "internet_exposed": model.internet_exposed,
+        "active_threat": model.active_threat,
+        "remediation_status": model.remediation_status,
+        "remediation_note": model.remediation_note,
+        "remediation_updated_by": model.remediation_updated_by,
+        "remediation_updated_at": model.remediation_updated_at,
         "matched_software": model.matched_software,
         "rationale": model.rationale,
         "first_seen": model.first_seen,
@@ -78,6 +88,23 @@ async def list_vulnerabilities(
     return [_vulnerability_to_dict(item) for item in items]
 
 
+def _enriched_exposure_to_dict(exposure, vuln) -> dict[str, Any]:
+    data = _exposure_to_dict(exposure)
+    data.update(
+        {
+            "cve_summary": vuln.summary,
+            "cvss_score": vuln.cvss_score,
+            "epss_score": vuln.epss_score,
+            "epss_percentile": vuln.epss_percentile,
+            "severity": vuln.severity,
+            "known_exploited": vuln.known_exploited,
+            "exploit_available": vuln.exploit_available,
+            "cve_published_at": vuln.published_at,
+        }
+    )
+    return data
+
+
 @router.get("/exposures")
 async def list_exposures(
     session: Annotated[AsyncSession, Depends(get_db_session)],
@@ -87,14 +114,45 @@ async def list_exposures(
     limit: int = Query(default=100, ge=1, le=500),
     offset: int = Query(default=0, ge=0),
 ) -> list[dict[str, Any]]:
+    """Prioritized asset exposures joined with CVE intel (CVSS/EPSS/KEV).
+
+    Returned rows are ordered by risk_score so the Exposure view can render
+    the prioritized list in a single request.
+    """
     service = VulnerabilityService(PostgresVulnerabilityRepository(session))
-    items = await service.list_exposures(
+    rows = await service.list_enriched_exposures(
         agent_id=agent_id,
         min_risk_score=min_risk_score,
         limit=limit,
         offset=offset,
     )
-    return [_exposure_to_dict(item) for item in items]
+    return [_enriched_exposure_to_dict(exposure, vuln) for exposure, vuln in rows]
+
+
+class RemediationUpdate(BaseModel):
+    """Analyst decision on what to do about an exposure."""
+
+    status: Literal["OPEN", "IN_PROGRESS", "RESOLVED", "RISK_ACCEPTED", "FALSE_POSITIVE"]
+    note: str = Field(default="", max_length=2000)
+
+
+@router.patch("/exposures/{exposure_id}/remediation")
+async def update_exposure_remediation(
+    exposure_id: int,
+    payload: RemediationUpdate,
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+    user: Annotated[TokenPayload, Depends(require_role(["admin", "analyst"]))],
+) -> dict[str, Any]:
+    """Set an exposure's remediation state (open / in progress / resolved /
+    risk accepted / false positive). This turns the view from a list of
+    problems into a tracked workflow."""
+    repo = PostgresVulnerabilityRepository(session)
+    model = await repo.set_remediation(
+        exposure_id, status=payload.status, note=payload.note, actor=user.sub
+    )
+    if model is None:
+        raise HTTPException(status_code=404, detail="Exposure not found.")
+    return _exposure_to_dict(model)
 
 
 @router.post("/sync")
@@ -127,12 +185,17 @@ async def evaluate_agent_exposure(
     )
     criticality = str(agent.get("criticality") or "MEDIUM").upper()
 
+    # Local real-time signal: service categories a honeypot saw attacked recently.
+    honeypot_sessions = await PostgresHoneypotRepository(session).recent_sessions(within_hours=24)
+    active_threat_services = active_service_categories(honeypot_sessions, within_hours=24)
+
     service = VulnerabilityService(PostgresVulnerabilityRepository(session))
     exposures = await service.evaluate_agent(
         agent_id=agent_id,
         asset_risk_score=int(agent.get("risk_score") or 0),
         internet_exposed=effective_internet_exposed,
         criticality=criticality,
+        active_threat_services=active_threat_services,
     )
     return {
         "agent_id": agent_id,

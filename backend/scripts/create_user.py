@@ -1,5 +1,5 @@
 """
-Create a SentinelX user (e.g. the first admin account).
+Create a SanitialX user (e.g. the first admin account).
 
 There is intentionally no public self-service signup endpoint — that would
 let anyone mint themselves an 'admin' account, the exact vulnerability this
@@ -8,7 +8,7 @@ script replaces. Run this from an operator shell instead:
     python -m scripts.create_user --username admin --role admin
 
 You will be prompted for a password (input hidden). Run inside the backend
-container/venv with the same SENTINELX_DATABASE_URL as the running app, e.g.:
+container/venv with the same SANITIALX_DATABASE_URL as the running app, e.g.:
 
     docker compose exec backend python -m scripts.create_user --username admin --role admin
 """
@@ -64,7 +64,7 @@ async def _create_user(username: str, password: str, role: str) -> None:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Create a SentinelX user.")
+    parser = argparse.ArgumentParser(description="Create a SanitialX user.")
     parser.add_argument("--username", required=True)
     parser.add_argument("--role", required=True, choices=sorted(VALID_ROLES))
     args = parser.parse_args()

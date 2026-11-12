@@ -20,7 +20,7 @@ class HoneypotSessionModel(Base):
     attacker_ip: Mapped[str] = mapped_column(String(45), index=True)
     service: Mapped[str] = mapped_column(String(50), index=True)  # SSH, Fake Web Panel, Fake DB
     started_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), index=True
     )
     ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     duration_seconds: Mapped[int] = mapped_column(Integer, default=0)

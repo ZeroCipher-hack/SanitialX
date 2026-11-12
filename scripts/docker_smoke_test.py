@@ -80,7 +80,7 @@ def check_compose() -> None:
     if proc.returncode != 0:
         fail("Docker Compose", (proc.stderr or proc.stdout).strip()[:500])
     output = proc.stdout
-    required = ["sentinelx-backend", "sentinelx-postgres", "sentinelx-redis", "sentinelx-worker"]
+    required = ["sanitialx-backend", "sanitialx-postgres", "sanitialx-redis", "sanitialx-worker"]
     missing = [name for name in required if name not in output]
     if missing:
         fail("Docker Compose services", f"missing from compose ps: {', '.join(missing)}")

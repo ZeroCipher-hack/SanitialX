@@ -1,5 +1,5 @@
 """
-Normalizer abstraction for SentinelX.
+Normalizer abstraction for SanitialX.
 
 Defines the single canonical :class:`BaseNormalizer` contract.  All
 normalizers must implement this interface.  There is intentionally no

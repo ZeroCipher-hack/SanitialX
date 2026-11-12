@@ -1,25 +1,25 @@
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: sentinelx-postgres
+    container_name: sanitialx-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-sentinelx}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-sentinelx_password_change_me}
-      POSTGRES_DB: ${POSTGRES_DB:-sentinelx}
+      POSTGRES_USER: ${POSTGRES_USER:-sanitialx}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-sanitialx_password_change_me}
+      POSTGRES_DB: ${POSTGRES_DB:-sanitialx}
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-sentinelx} -d ${POSTGRES_DB:-sentinelx}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-sanitialx} -d ${POSTGRES_DB:-sanitialx}"]
       interval: 3s
       timeout: 3s
       retries: 5
 
   redis:
     image: redis:7-alpine
-    container_name: sentinelx-redis
+    container_name: sanitialx-redis
     restart: unless-stopped
     command: redis-server --appendonly yes
     ports:
@@ -36,14 +36,14 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: sentinelx-migrate
+    container_name: sanitialx-migrate
     command: alembic upgrade head
     env_file:
       - ./backend/.env
     environment:
-      SENTINELX_DATABASE_URL: ${SENTINELX_DATABASE_URL:-postgresql+asyncpg://sentinelx:sentinelx_password_change_me@postgres:5432/sentinelx}
-      SENTINELX_API_KEY: ${SENTINELX_API_KEY:?SENTINELX_API_KEY must be set in .env}
-      SENTINELX_JWT_SECRET_KEY: ${SENTINELX_JWT_SECRET_KEY:?SENTINELX_JWT_SECRET_KEY must be set in .env}
+      SANITIALX_DATABASE_URL: ${SANITIALX_DATABASE_URL:-postgresql+asyncpg://sanitialx:sanitialx_password_change_me@postgres:5432/sanitialx}
+      SANITIALX_API_KEY: ${SANITIALX_API_KEY:?SANITIALX_API_KEY must be set in .env}
+      SANITIALX_JWT_SECRET_KEY: ${SANITIALX_JWT_SECRET_KEY:?SANITIALX_JWT_SECRET_KEY must be set in .env}
     depends_on:
       postgres:
         condition: service_healthy
@@ -52,24 +52,24 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: sentinelx-backend
+    container_name: sanitialx-backend
     restart: unless-stopped
     command: uvicorn main:create_app --factory --host 0.0.0.0 --port 8000
     env_file:
       - ./backend/.env
     ports:
-      - "${SENTINELX_API_PORT:-8000}:8000"
+      - "${SANITIALX_API_PORT:-8000}:8000"
     environment:
-      SENTINELX_APP_NAME: ${SENTINELX_APP_NAME:-SentinelX}
-      SENTINELX_ENVIRONMENT: ${SENTINELX_ENVIRONMENT:-production}
-      SENTINELX_LOG_LEVEL: ${SENTINELX_LOG_LEVEL:-INFO}
-      SENTINELX_REDIS_URL: ${SENTINELX_REDIS_URL:-redis://redis:6379/0}
-      SENTINELX_DATABASE_URL: ${SENTINELX_DATABASE_URL:-postgresql+asyncpg://sentinelx:sentinelx_password_change_me@postgres:5432/sentinelx}
-      SENTINELX_API_HOST: 0.0.0.0
-      SENTINELX_API_PORT: 8000
-      SENTINELX_API_KEY: ${SENTINELX_API_KEY:?SENTINELX_API_KEY must be set in .env}
-      SENTINELX_JWT_SECRET_KEY: ${SENTINELX_JWT_SECRET_KEY:?SENTINELX_JWT_SECRET_KEY must be set in .env}
-      SENTINELX_JWT_ALGORITHM: ${SENTINELX_JWT_ALGORITHM:-HS256}
+      SANITIALX_APP_NAME: ${SANITIALX_APP_NAME:-SanitialX}
+      SANITIALX_ENVIRONMENT: ${SANITIALX_ENVIRONMENT:-production}
+      SANITIALX_LOG_LEVEL: ${SANITIALX_LOG_LEVEL:-INFO}
+      SANITIALX_REDIS_URL: ${SANITIALX_REDIS_URL:-redis://redis:6379/0}
+      SANITIALX_DATABASE_URL: ${SANITIALX_DATABASE_URL:-postgresql+asyncpg://sanitialx:sanitialx_password_change_me@postgres:5432/sanitialx}
+      SANITIALX_API_HOST: 0.0.0.0
+      SANITIALX_API_PORT: 8000
+      SANITIALX_API_KEY: ${SANITIALX_API_KEY:?SANITIALX_API_KEY must be set in .env}
+      SANITIALX_JWT_SECRET_KEY: ${SANITIALX_JWT_SECRET_KEY:?SANITIALX_JWT_SECRET_KEY must be set in .env}
+      SANITIALX_JWT_ALGORITHM: ${SANITIALX_JWT_ALGORITHM:-HS256}
     depends_on:
       postgres:
         condition: service_healthy
@@ -82,19 +82,19 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: sentinelx-worker
+    container_name: sanitialx-worker
     restart: unless-stopped
     env_file:
       - ./backend/.env
     command: python scripts/run_worker.py
     environment:
-      SENTINELX_APP_NAME: ${SENTINELX_APP_NAME:-SentinelX}
-      SENTINELX_ENVIRONMENT: ${SENTINELX_ENVIRONMENT:-production}
-      SENTINELX_LOG_LEVEL: ${SENTINELX_LOG_LEVEL:-INFO}
-      SENTINELX_REDIS_URL: ${SENTINELX_REDIS_URL:-redis://redis:6379/0}
-      SENTINELX_DATABASE_URL: ${SENTINELX_DATABASE_URL:-postgresql+asyncpg://sentinelx:sentinelx_password_change_me@postgres:5432/sentinelx}
-      SENTINELX_API_KEY: ${SENTINELX_API_KEY:?SENTINELX_API_KEY must be set in .env}
-      SENTINELX_JWT_SECRET_KEY: ${SENTINELX_JWT_SECRET_KEY:?SENTINELX_JWT_SECRET_KEY must be set in .env}
+      SANITIALX_APP_NAME: ${SANITIALX_APP_NAME:-SanitialX}
+      SANITIALX_ENVIRONMENT: ${SANITIALX_ENVIRONMENT:-production}
+      SANITIALX_LOG_LEVEL: ${SANITIALX_LOG_LEVEL:-INFO}
+      SANITIALX_REDIS_URL: ${SANITIALX_REDIS_URL:-redis://redis:6379/0}
+      SANITIALX_DATABASE_URL: ${SANITIALX_DATABASE_URL:-postgresql+asyncpg://sanitialx:sanitialx_password_change_me@postgres:5432/sanitialx}
+      SANITIALX_API_KEY: ${SANITIALX_API_KEY:?SANITIALX_API_KEY must be set in .env}
+      SANITIALX_JWT_SECRET_KEY: ${SANITIALX_JWT_SECRET_KEY:?SANITIALX_JWT_SECRET_KEY must be set in .env}
     depends_on:
       postgres:
         condition: service_healthy
@@ -107,19 +107,52 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: sentinelx-vulnerability-scheduler
+    container_name: sanitialx-vulnerability-scheduler
     restart: unless-stopped
     env_file:
       - ./backend/.env
     command: python scripts/run_vulnerability_scheduler.py
     environment:
-      SENTINELX_APP_NAME: ${SENTINELX_APP_NAME:-SentinelX}
-      SENTINELX_ENVIRONMENT: ${SENTINELX_ENVIRONMENT:-production}
-      SENTINELX_LOG_LEVEL: ${SENTINELX_LOG_LEVEL:-INFO}
-      SENTINELX_DATABASE_URL: ${SENTINELX_DATABASE_URL:-postgresql+asyncpg://sentinelx:sentinelx_password_change_me@postgres:5432/sentinelx}
-      SENTINELX_API_KEY: ${SENTINELX_API_KEY:?SENTINELX_API_KEY must be set in .env}
-      SENTINELX_JWT_SECRET_KEY: ${SENTINELX_JWT_SECRET_KEY:?SENTINELX_JWT_SECRET_KEY must be set in .env}
-      SENTINELX_VULNERABILITY_SYNC_INTERVAL_SECONDS: ${SENTINELX_VULNERABILITY_SYNC_INTERVAL_SECONDS:-3600}
+      SANITIALX_APP_NAME: ${SANITIALX_APP_NAME:-SanitialX}
+      SANITIALX_ENVIRONMENT: ${SANITIALX_ENVIRONMENT:-production}
+      SANITIALX_LOG_LEVEL: ${SANITIALX_LOG_LEVEL:-INFO}
+      SANITIALX_DATABASE_URL: ${SANITIALX_DATABASE_URL:-postgresql+asyncpg://sanitialx:sanitialx_password_change_me@postgres:5432/sanitialx}
+      SANITIALX_API_KEY: ${SANITIALX_API_KEY:?SANITIALX_API_KEY must be set in .env}
+      SANITIALX_JWT_SECRET_KEY: ${SANITIALX_JWT_SECRET_KEY:?SANITIALX_JWT_SECRET_KEY must be set in .env}
+      SANITIALX_VULNERABILITY_SYNC_INTERVAL_SECONDS: ${SANITIALX_VULNERABILITY_SYNC_INTERVAL_SECONDS:-3600}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
+  # Low-interaction honeypot decoys. Opt-in only:
+  #   docker compose --profile honeypot up -d honeypot
+  # A decoy logs attacker connections (never executes input); the hits become
+  # the local "under active attack" signal that boosts matching exposures.
+  honeypot:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: sanitialx-honeypot
+    restart: unless-stopped
+    profiles: ["honeypot"]
+    env_file:
+      - ./backend/.env
+    command: python scripts/run_honeypot.py
+    ports:
+      - "${SANITIALX_HONEYPOT_SSH_PORT:-2222}:2222"
+      - "${SANITIALX_HONEYPOT_WEB_PORT:-8080}:8080"
+      - "${SANITIALX_HONEYPOT_TELNET_PORT:-2323}:2323"
+    environment:
+      SANITIALX_ENVIRONMENT: ${SANITIALX_ENVIRONMENT:-production}
+      SANITIALX_LOG_LEVEL: ${SANITIALX_LOG_LEVEL:-INFO}
+      SANITIALX_DATABASE_URL: ${SANITIALX_DATABASE_URL:-postgresql+asyncpg://sanitialx:sanitialx_password_change_me@postgres:5432/sanitialx}
+      SANITIALX_API_KEY: ${SANITIALX_API_KEY:?SANITIALX_API_KEY must be set in .env}
+      SANITIALX_JWT_SECRET_KEY: ${SANITIALX_JWT_SECRET_KEY:?SANITIALX_JWT_SECRET_KEY must be set in .env}
+      SANITIALX_HONEYPOT_ENABLED: "true"
+      SANITIALX_HONEYPOT_HOST: "0.0.0.0"
+      SANITIALX_HONEYPOT_PORTS: ${SANITIALX_HONEYPOT_PORTS:-2222:SSH,8080:Fake Web Panel,2323:Telnet}
     depends_on:
       postgres:
         condition: service_healthy

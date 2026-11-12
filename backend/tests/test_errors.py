@@ -1,4 +1,4 @@
-"""Unit tests for core.errors — SentinelXError hierarchy."""
+"""Unit tests for core.errors — SanitialXError hierarchy."""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ from core.errors import (
     SensorError,
     SensorStartError,
     SensorStopError,
-    SentinelXError,
+    SanitialXError,
     ValidationError,
 )
 
@@ -24,7 +24,7 @@ class TestErrorHierarchy:
     """Validate the exception hierarchy relationships."""
 
     def test_root_is_exception(self) -> None:
-        assert issubclass(SentinelXError, Exception)
+        assert issubclass(SanitialXError, Exception)
 
     @pytest.mark.parametrize(
         "exc_cls",
@@ -39,8 +39,8 @@ class TestErrorHierarchy:
         ],
     )
     def test_direct_children(self, exc_cls: type) -> None:
-        """Each category error must be a direct or indirect child of SentinelXError."""
-        assert issubclass(exc_cls, SentinelXError)
+        """Each category error must be a direct or indirect child of SanitialXError."""
+        assert issubclass(exc_cls, SanitialXError)
 
     def test_sensor_sub_errors(self) -> None:
         assert issubclass(SensorStartError, SensorError)
@@ -53,7 +53,7 @@ class TestErrorHierarchy:
         assert issubclass(IncidentConflictError, IncidentError)
 
     def test_catch_all(self) -> None:
-        """Catching SentinelXError must catch every sub-error."""
+        """Catching SanitialXError must catch every sub-error."""
         for exc_cls in (
             ConfigurationError,
             ValidationError,
@@ -64,7 +64,7 @@ class TestErrorHierarchy:
             CorrelationError,
             IncidentConflictError,
         ):
-            with pytest.raises(SentinelXError):
+            with pytest.raises(SanitialXError):
                 raise exc_cls("test")
 
     def test_no_infrastructure_imports(self) -> None:

@@ -3,13 +3,20 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
-  Shield, Activity, AlertTriangle, FileText, Sliders, LogOut, Bell, X, Play, Cpu,
+  Activity, AlertTriangle, FileText, Sliders, LogOut, Bell, X, Play, Cpu,
   Layers, Zap, Radio, Share2, Crosshair, Box, Brain, CheckCircle2, Loader2,
-  BookOpen, ScrollText, Bug, ChevronRight,
+  BookOpen, ScrollText, Bug, ChevronRight, ShieldAlert,
 } from 'lucide-react';
 import { useEffect, useState, useRef } from 'react';
 import { api, logout, runAttackSimulation } from '@/lib/api';
 import type { Incident } from '@/types/api';
+
+// Secondary nav lives behind the "Ko'proq" toggle so the sidebar leads with the
+// six pillars of the story. Pages stay fully reachable; only the links collapse.
+const MORE_PATHS = [
+  '/events', '/rules', '/techniques', '/vulnerabilities',
+  '/agents', '/assets', '/simulations', '/attack-graph', '/reports', '/guide',
+];
 
 type VulnerabilityAlert = {
   id: number;
@@ -34,6 +41,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [showQuickActions, setShowQuickActions] = useState(false);
   const [demoRunning, setDemoRunning] = useState(false);
   const [demoMessage, setDemoMessage] = useState('');
+  const [showMore, setShowMore] = useState(false);
   const notifRef = useRef<HTMLDivElement>(null);
   const quickActionsRef = useRef<HTMLDivElement>(null);
 
@@ -57,6 +65,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       setVulnerabilityAlerts([]);
     });
   };
+
+  // Keep the secondary section open whenever the active page lives inside it,
+  // so the highlighted link is never hidden.
+  useEffect(() => {
+    if (MORE_PATHS.includes(pathname)) setShowMore(true);
+  }, [pathname]);
 
   useEffect(() => {
     if (pathname === '/login') return;
@@ -116,41 +130,60 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     <div className="app-grid">
       <aside className="sidebar">
         <div className="brand">
-          <div className="brand-logo"><Shield size={20} color="#00e5ff" /></div>
-          <div className="brand-text"><strong>SANITIALX</strong><small>AI CYBER RANGE & SIEM</small></div>
+          <div className="brand-logo" aria-hidden="true">
+            <svg viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+              <path d="M256 48 L416 104 V240 C416 340 344 416 256 464 C168 416 96 340 96 240 V104 Z" fill="#0C1526" stroke="#00E5FF" strokeWidth="26" strokeLinejoin="round" />
+              <line x1="154" y1="160" x2="366" y2="160" stroke="#00E5FF" strokeWidth="28" strokeLinecap="round" />
+              <line x1="154" y1="214" x2="314" y2="214" stroke="#3FD9EE" strokeOpacity="0.24" strokeWidth="28" strokeLinecap="round" />
+              <line x1="154" y1="268" x2="270" y2="268" stroke="#3FD9EE" strokeOpacity="0.24" strokeWidth="28" strokeLinecap="round" />
+              <line x1="154" y1="322" x2="226" y2="322" stroke="#3FD9EE" strokeOpacity="0.24" strokeWidth="28" strokeLinecap="round" />
+            </svg>
+          </div>
+          <div className="brand-text"><strong>SANITIAL</strong><small>AI CYBER RANGE &amp; SIEM</small></div>
         </div>
 
         <nav className="nav" aria-label="Asosiy navigatsiya">
-          <div className="nav-group-title">UMUMIY KO‘RINISH</div>
+          <div className="nav-group-title">ASOSIY</div>
           {item('/dashboard', 'Boshqaruv paneli', <Activity size={17} />)}
-
-          <div className="nav-group-title">MONITORING</div>
-          {item('/events', 'Xavfsizlik hodisalari', <Radio size={17} />)}
+          {item('/exposure', 'Exposure (ustuvor)', <ShieldAlert size={17} />)}
           {item('/incidents', 'Hodisa markazi', <AlertTriangle size={17} />)}
+          {item('/honeypots', 'Honeypot markazi', <Zap size={17} />)}
+          {item('/ai-analysis', 'AI xavfsizlik tahlili', <Brain size={17} />)}
           {item('/logs', 'Tizim loglari', <ScrollText size={17} />)}
 
-          <div className="nav-group-title">ANIQLASH</div>
-          {item('/rules', 'Aniqlash qoidalari', <Sliders size={17} />)}
-          {item('/techniques', 'MITRE ATT&CK', <Layers size={17} />)}
-          {item('/vulnerabilities', 'Vulnerability Center', <Bug size={17} />)}
+          <button
+            type="button"
+            className={`nav-item nav-more-toggle ${showMore ? 'open' : ''}`}
+            onClick={() => setShowMore((v) => !v)}
+            aria-expanded={showMore}
+          >
+            <ChevronRight size={17} className="nav-more-chevron" />
+            <span>Ko‘proq</span>
+          </button>
 
-          <div className="nav-group-title">MUHIT</div>
-          {item('/agents', 'Endpoint agentlar', <Cpu size={17} />)}
-          {item('/assets', 'Kiber poligon aktivlari', <Box size={17} />)}
+          {showMore && (
+            <div className="nav-more">
+              <div className="nav-group-title">MONITORING</div>
+              {item('/events', 'Xavfsizlik hodisalari', <Radio size={17} />)}
 
-          <div className="nav-group-title">DECEPTION</div>
-          {item('/honeypots', 'Honeypot markazi', <Zap size={17} />)}
+              <div className="nav-group-title">ANIQLASH</div>
+              {item('/rules', 'Aniqlash qoidalari', <Sliders size={17} />)}
+              {item('/techniques', 'MITRE ATT&CK', <Layers size={17} />)}
+              {item('/vulnerabilities', 'Vulnerability Center', <Bug size={17} />)}
 
-          <div className="nav-group-title">SIMULYATSIYA</div>
-          {item('/simulations', 'Hujum simulyatori', <Crosshair size={17} />)}
+              <div className="nav-group-title">MUHIT</div>
+              {item('/agents', 'Endpoint agentlar', <Cpu size={17} />)}
+              {item('/assets', 'Kiber poligon aktivlari', <Box size={17} />)}
 
-          <div className="nav-group-title">TAHLIL</div>
-          {item('/attack-graph', 'Hujum yo‘li grafigi', <Share2 size={17} />)}
-          {item('/ai-analysis', 'AI xavfsizlik tahlili', <Brain size={17} />)}
-          {item('/reports', 'Avtomatik hisobotlar', <FileText size={17} />)}
+              <div className="nav-group-title">SIMULYATSIYA &amp; TAHLIL</div>
+              {item('/simulations', 'Hujum simulyatori', <Crosshair size={17} />)}
+              {item('/attack-graph', 'Hujum yo‘li grafigi', <Share2 size={17} />)}
+              {item('/reports', 'Avtomatik hisobotlar', <FileText size={17} />)}
 
-          <div className="nav-group-title">YORDAM</div>
-          {item('/guide', 'Qo‘llanma va test', <BookOpen size={17} />)}
+              <div className="nav-group-title">YORDAM</div>
+              {item('/guide', 'Qo‘llanma va test', <BookOpen size={17} />)}
+            </div>
+          )}
         </nav>
 
         <div className="sidebar-footer">

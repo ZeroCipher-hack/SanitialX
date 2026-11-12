@@ -1,4 +1,4 @@
-"""Official vulnerability feed clients for NVD CVE 2.0 and CISA KEV."""
+"""Official vulnerability feed clients for NVD CVE 2.0, CISA KEV and FIRST EPSS."""
 
 from __future__ import annotations
 
@@ -11,7 +11,18 @@ import httpx
 
 NVD_CVE_API_URL = "https://services.nvd.nist.gov/rest/json/cves/2.0"
 CISA_KEV_JSON_URL = "https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json"
+EPSS_API_URL = "https://api.first.org/data/v1/epss"
+# FIRST accepts a comma-separated cve list; keep batches small enough to stay
+# well under practical URL-length limits.
+EPSS_BATCH_SIZE = 100
 _RETRYABLE_STATUS = {429, 500, 502, 503, 504}
+
+
+def _safe_float(value: Any) -> float | None:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
 
 
 def _parse_datetime(value: str | None) -> datetime | None:
@@ -160,3 +171,41 @@ class CisaKevFeedClient:
             for item in catalog.get("vulnerabilities") or []
             if item.get("cveID")
         }
+
+
+def parse_epss_payload(payload: dict[str, Any]) -> dict[str, tuple[float, float | None]]:
+    """Extract {CVE_ID: (epss_score, percentile)} from a FIRST EPSS response.
+
+    Rows without a parseable ``epss`` probability are skipped; the percentile
+    is optional and defaults to ``None`` when absent or malformed.
+    """
+    scores: dict[str, tuple[float, float | None]] = {}
+    for row in payload.get("data") or []:
+        cve_id = str(row.get("cve") or "").upper()
+        epss = _safe_float(row.get("epss"))
+        if not cve_id or epss is None:
+            continue
+        scores[cve_id] = (epss, _safe_float(row.get("percentile")))
+    return scores
+
+
+class EpssFeedClient:
+    """Client for the FIRST.org EPSS API (exploit-prediction scoring)."""
+
+    def __init__(self, *, timeout: float = 30.0, batch_size: int = EPSS_BATCH_SIZE) -> None:
+        self._timeout = timeout
+        self._batch_size = max(1, batch_size)
+
+    async def fetch_scores(self, cve_ids: list[str]) -> dict[str, tuple[float, float | None]]:
+        """Fetch EPSS scores for the given CVE IDs, batching requests."""
+        unique = sorted({str(c).upper() for c in cve_ids if c})
+        results: dict[str, tuple[float, float | None]] = {}
+        for index in range(0, len(unique), self._batch_size):
+            batch = unique[index : index + self._batch_size]
+            payload = await _get_json_with_retry(
+                EPSS_API_URL,
+                timeout=self._timeout,
+                params={"cve": ",".join(batch)},
+            )
+            results.update(parse_epss_payload(payload))
+        return results

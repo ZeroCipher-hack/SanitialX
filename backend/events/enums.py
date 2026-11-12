@@ -1,5 +1,5 @@
 """
-Event type enumeration for SentinelX.
+Event type enumeration for SanitialX.
 
 This module defines the canonical set of event types that the system can
 observe or detect. It is pure-domain — no infrastructure imports.
@@ -17,7 +17,7 @@ from enum import Enum, unique
 
 @unique
 class EventType(str, Enum):
-    """Canonical event types recognised by SentinelX.
+    """Canonical event types recognised by SanitialX.
 
     Raw observation types — produced by sensors/normalizers:
       TCP          – a TCP packet observation

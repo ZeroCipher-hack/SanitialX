@@ -1,5 +1,5 @@
 """
-JWT Authentication & Security Utilities for SentinelX.
+JWT Authentication & Security Utilities for SanitialX.
 
 Architecture Invariants:
 - Role-based token claims (reader, analyst, admin).

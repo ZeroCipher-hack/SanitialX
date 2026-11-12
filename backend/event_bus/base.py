@@ -1,5 +1,5 @@
 """
-EventBus interfaces for SentinelX.
+EventBus interfaces for SanitialX.
 
 Defines the single canonical abstractions for event transport:
   - :class:`EventPublisher`: abstract publish interface

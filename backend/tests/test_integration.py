@@ -1,5 +1,5 @@
 """
-Phase 16 — Integration Tests for SentinelX.
+Phase 16 — Integration Tests for SanitialX.
 
 Coverage:
 1. EventBus publishing and consumption round-trip semantics.

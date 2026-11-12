@@ -14,7 +14,7 @@ class RedisCorrelationStateStore(CorrelationStateStore):
 
     requires_thread_offload = True
 
-    def __init__(self, redis_client: Any, namespace: str = "sentinelx:corr") -> None:
+    def __init__(self, redis_client: Any, namespace: str = "sanitialx:corr") -> None:
         self._redis = redis_client
         self._namespace = namespace.rstrip(":")
         self._index_key = f"{self._namespace}:index"

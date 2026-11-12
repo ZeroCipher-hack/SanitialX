@@ -1,5 +1,5 @@
 """
-Dependency Container for SentinelX — Single Composition Root.
+Dependency Container for SanitialX — Single Composition Root.
 
 Architecture Invariants:
 - Single composition root in core/container.py.

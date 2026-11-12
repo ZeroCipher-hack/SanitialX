@@ -1,5 +1,5 @@
 """
-Event processing pipeline for SentinelX.
+Event processing pipeline for SanitialX.
 
 Orchestrates the full raw-event-to-published-event flow:
   raw → normalise (via Dispatcher) → validate → publish → record stats

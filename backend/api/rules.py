@@ -1,5 +1,5 @@
 """
-Detection Rules API router for SentinelX.
+Detection Rules API router for SanitialX.
 
 Endpoints:
 - GET /rules (paginated, authenticated)

@@ -2,7 +2,7 @@
 Redis Streams implementation of EventBus.
 
 CRITICAL INVARIANT:
-This file is the ONLY production module in SentinelX allowed to import
+This file is the ONLY production module in SanitialX allowed to import
 redis or redis.asyncio. Other modules receive injected clients.
 """
 
@@ -23,8 +23,8 @@ from events.models import NormalizedEvent
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_STREAM_NAME = "sentinelx.events"
-DEFAULT_CONSUMER_GROUP = "sentinelx-consumers"
+DEFAULT_STREAM_NAME = "sanitialx.events"
+DEFAULT_CONSUMER_GROUP = "sanitialx-consumers"
 
 
 def create_redis_client(url: str) -> aioredis.Redis:  # type: ignore[type-arg]

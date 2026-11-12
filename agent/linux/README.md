@@ -12,7 +12,7 @@ sudo chmod 0755 /opt/sanitialx-agent/sanitialx_agent.py
 
 ## 2. Enroll
 
-Use the backend enrollment key (`SENTINELX_API_KEY`) only for bootstrap enrollment. The returned per-agent token is stored locally and used afterward.
+Use the backend enrollment key (`SANITIALX_API_KEY`) only for bootstrap enrollment. The returned per-agent token is stored locally and used afterward.
 
 ```bash
 sudo SANITIALX_ENROLLMENT_KEY='<enrollment-key>' \

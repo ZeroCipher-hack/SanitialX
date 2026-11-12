@@ -1,0 +1,99 @@
+# SanitialX backend — Render Blueprint (Infrastructure as Code).
+#
+# One-click-ish deploy of the backend tier: PostgreSQL, Key Value (Redis),
+# the FastAPI API, the correlation worker and the vulnerability sync
+# scheduler. The frontend deploys separately on Vercel (see DEPLOY.md).
+#
+# This is a starting blueprint — review plans and the Key Value service type
+# ("keyvalue") against your current Render dashboard before applying, and set
+# the `sync: false` values (frontend origin, Gemini key) in the dashboard.
+
+databases:
+  - name: sanitialx-db
+    databaseName: sanitialx
+    user: sanitialx
+    plan: free # 30-day free Postgres; upgrade for anything real
+
+envVarGroups:
+  - name: sanitialx-secrets
+    envVars:
+      # Generated once and shared across services so the API and workers agree.
+      - key: SANITIALX_JWT_SECRET_KEY
+        generateValue: true
+      - key: SANITIALX_API_KEY
+        generateValue: true
+
+services:
+  - type: keyvalue
+    name: sanitialx-kv
+    plan: free
+    ipAllowList: [] # internal connections only
+
+  - type: web
+    name: sanitialx-backend
+    runtime: docker
+    repo: https://github.com/ZeroCipher-hack/SanitialX
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    plan: starter
+    healthCheckPath: /api/v1/health
+    preDeployCommand: alembic upgrade head # run migrations before each deploy
+    envVars:
+      - fromGroup: sanitialx-secrets
+      - key: SANITIALX_ENVIRONMENT
+        value: production
+      - key: SANITIALX_DATABASE_URL
+        fromDatabase:
+          name: sanitialx-db
+          property: connectionString
+      - key: SANITIALX_REDIS_URL
+        fromService:
+          type: keyvalue
+          name: sanitialx-kv
+          property: connectionString
+      - key: SANITIALX_FRONTEND_ORIGIN
+        sync: false # set to your Vercel URL, e.g. https://sanitialx.vercel.app
+      - key: SANITIALX_GEMINI_API_KEY
+        sync: false # optional; AI analysis falls back gracefully without it
+
+  - type: worker
+    name: sanitialx-worker
+    runtime: docker
+    repo: https://github.com/ZeroCipher-hack/SanitialX
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    dockerCommand: python scripts/run_worker.py
+    plan: starter
+    envVars:
+      - fromGroup: sanitialx-secrets
+      - key: SANITIALX_DATABASE_URL
+        fromDatabase:
+          name: sanitialx-db
+          property: connectionString
+      - key: SANITIALX_REDIS_URL
+        fromService:
+          type: keyvalue
+          name: sanitialx-kv
+          property: connectionString
+
+  - type: worker
+    name: sanitialx-vuln-scheduler
+    runtime: docker
+    repo: https://github.com/ZeroCipher-hack/SanitialX
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    dockerCommand: python scripts/run_vulnerability_scheduler.py
+    plan: starter
+    envVars:
+      - fromGroup: sanitialx-secrets
+      - key: SANITIALX_DATABASE_URL
+        fromDatabase:
+          name: sanitialx-db
+          property: connectionString
+      - key: SANITIALX_REDIS_URL
+        fromService:
+          type: keyvalue
+          name: sanitialx-kv
+          property: connectionString
+      - key: SANITIALX_VULNERABILITY_SYNC_INTERVAL_SECONDS
+        value: "3600"

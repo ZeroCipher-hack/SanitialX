@@ -25,11 +25,12 @@ httpx>=0.25,<1.0
 PyJWT>=2.8,<3.0
 
 # Google Gemini AI
-# API key is supplied only through SENTINELX_GEMINI_API_KEY.
+# API key is supplied only through SANITIALX_GEMINI_API_KEY.
 google-genai>=1.0,<2.0
 
 # Testing
+# API endpoint tests drive the ASGI app through httpx.ASGITransport (httpx is
+# already a runtime dependency above), so no separate test client is needed.
 pytest>=7.0,<10.0
 pytest-asyncio>=0.21,<1.0
-async-asgi-testclient>=1.4,<2.0
 fakeredis>=2.26,<3.0

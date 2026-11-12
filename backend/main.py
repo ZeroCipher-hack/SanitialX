@@ -1,5 +1,5 @@
 """
-SentinelX FastAPI Application Entrypoint.
+SanitialX FastAPI Application Entrypoint.
 """
 
 from __future__ import annotations
@@ -17,7 +17,7 @@ def create_app() -> FastAPI:
     settings = get_settings()
     app = FastAPI(
         title=settings.app_name,
-        description="SentinelX Modular Production-Grade Async SIEM Backend",
+        description="SanitialX Modular Production-Grade Async SIEM Backend",
         version="1.0.0",
         lifespan=lifespan,
     )

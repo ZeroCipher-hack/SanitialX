@@ -1,5 +1,5 @@
 """
-Incident domain model for SentinelX.
+Incident domain model for SanitialX.
 
 Invariants (architecture.md #5 & #7):
 - Frozen (immutable) domain model to prevent accidental direct in-memory mutation.

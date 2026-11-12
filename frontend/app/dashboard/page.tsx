@@ -46,6 +46,18 @@ type VulnerabilityAlert = {
   created_at: string;
 };
 
+type Exposure = {
+  id: number;
+  agent_id: string;
+  cve_id: string;
+  risk_score: number;
+  cvss_score: number | null;
+  epss_score: number | null;
+  severity: string;
+  known_exploited: boolean;
+  active_threat: boolean;
+};
+
 const EMPTY_ASSETS: AssetSummary = {
   total_assets: 0,
   critical_assets: 0,
@@ -58,13 +70,8 @@ const EMPTY_ASSETS: AssetSummary = {
   stale_inventory_assets: 0,
 };
 
-const MAP_POINTS = [
-  { left: '23%', top: '41%' },
-  { left: '43%', top: '34%' },
-  { left: '57%', top: '43%' },
-  { left: '70%', top: '49%' },
-  { left: '79%', top: '68%' },
-];
+const riskClass = (score: number) =>
+  score >= 90 ? 'crit' : score >= 70 ? 'high' : score >= 40 ? 'med' : 'low';
 
 const windowMs = (range: TimeRange) =>
   range === '24H' ? 86_400_000 : range === '7D' ? 604_800_000 : 2_592_000_000;
@@ -115,45 +122,12 @@ function ActivityChart({ incidents, timeRange }: { incidents: Incident[]; timeRa
   );
 }
 
-function ThreatMap({ sources }: { sources: [string, number][] }) {
-  return (
-    <div className="soc-map">
-      <svg className="soc-world" viewBox="0 0 1000 460" aria-hidden="true">
-        <path className="gridline" d="M0 115H1000M0 230H1000M0 345H1000M250 0V460M500 0V460M750 0V460" />
-        <path d="M78 122l48-45 66-13 63 17 32 34 41 5 22 28-24 38-44 20-28 47-45 6-34-31-45-12-22-43-38-16z" />
-        <path d="M278 270l38 9 31 42-4 55-23 54-20-5-14-46-20-47z" />
-        <path d="M440 106l43-22 46 8 27 25 27-8 34 12 28 35 54 8 42 34-15 35-51 9-21 38-52-7-31 26-45-17-11-39-39-16-30-43-26-9 9-44z" />
-        <path d="M490 246l50 14 45 34-2 57-30 65-41-13-21-50-18-56z" />
-        <path d="M742 315l44-24 56 8 41 32-8 35-48 15-49-14-29-24z" />
-        <path d="M384 118l18-19 17 9-2 22-22 5zM865 195l18-12 16 15-9 17z" />
-        {sources.slice(0, 4).map((_, index) => {
-          const x1 = [230, 430, 570, 700][index];
-          const y1 = [190, 155, 195, 220][index];
-          return <path key={index} className="soc-arc" d={`M${x1} ${y1} Q500 ${45 + index * 18} 620 205`} />;
-        })}
-      </svg>
-
-      {sources.slice(0, 5).map(([ip, count], index) => (
-        <div key={ip} style={{ position: 'absolute', ...MAP_POINTS[index] }}>
-          <span className="soc-map-point" />
-          <div className="soc-map-label"><b>{ip}</b><strong>{count} incident</strong><br />source telemetry</div>
-        </div>
-      ))}
-
-      {!sources.length && <div className="soc-map-empty">Hozircha source IP telemetriyasi mavjud emas.</div>}
-      <div className="soc-map-legend">
-        <span><i className="crit" />Kritik</span><span><i className="high" />Yuqori</span>
-      </div>
-      <div className="soc-map-note">Geo nuqtalar vizual · source IP ma’lumoti real</div>
-    </div>
-  );
-}
-
 export default function Dashboard() {
   const [incidents, setIncidents] = useState<Incident[]>([]);
   const [events, setEvents] = useState<SecurityEvent[]>([]);
   const [assets, setAssets] = useState<AssetSummary>(EMPTY_ASSETS);
   const [vulnAlerts, setVulnAlerts] = useState<VulnerabilityAlert[]>([]);
+  const [exposures, setExposures] = useState<Exposure[]>([]);
   const [timeRange, setTimeRange] = useState<TimeRange>('24H');
   const [loading, setLoading] = useState(true);
   const [errors, setErrors] = useState<string[]>([]);
@@ -166,6 +140,7 @@ export default function Dashboard() {
       api<SecurityEvent[]>('/events?limit=250'),
       api<AssetSummary>('/agents/summary'),
       api<VulnerabilityAlert[]>('/vulnerability-alerts?unacknowledged_only=true&limit=100'),
+      api<Exposure[]>('/vulnerabilities/exposures'),
     ]);
 
     const nextErrors: string[] = [];
@@ -177,6 +152,8 @@ export default function Dashboard() {
     else nextErrors.push('assets');
     if (results[3].status === 'fulfilled') setVulnAlerts(results[3].value);
     else nextErrors.push('vulnerabilities');
+    if (results[4].status === 'fulfilled') setExposures(results[4].value);
+    else nextErrors.push('exposures');
 
     setErrors(nextErrors);
     setLastRefresh(new Date());
@@ -225,15 +202,9 @@ export default function Dashboard() {
   const securityScore = Math.max(0, 100 - riskIndex);
   const managedCoverage = assets.total_assets ? Math.round((assets.managed_assets / assets.total_assets) * 100) : 0;
 
-  const sources = Array.from(
-    filtered
-      .filter((item) => item.source_ip)
-      .reduce<Map<string, number>>(
-        (map, item) => map.set(item.source_ip!, (map.get(item.source_ip!) || 0) + 1),
-        new Map()
-      )
-      .entries()
-  ).sort((a, b) => b[1] - a[1]).slice(0, 5);
+  const topExposures = [...exposures]
+    .sort((a, b) => b.risk_score - a.risk_score)
+    .slice(0, 6);
 
   const totalSeverity = Math.max(counts.critical + counts.high + counts.medium + counts.low, 1);
   const pct = (value: number) => Math.round((value / totalSeverity) * 100);
@@ -273,16 +244,30 @@ export default function Dashboard() {
       </section>
 
       <section className="soc-stage">
-        <div className="soc-panel">
+        <div className="soc-panel soc-exposures">
           <div className="soc-panel-head">
-            <div><h2>Global Threat Map</h2><p>Source IP telemetriyasi va real incident oqimi</p></div>
-            <div className="range">
-              {(['24H', '7D', '30D'] as TimeRange[]).map((range) => (
-                <button key={range} className={timeRange === range ? 'active' : ''} onClick={() => setTimeRange(range)}>{range}</button>
-              ))}
-            </div>
+            <div><h2>Ustuvor ekspozitsiyalar</h2><p>CVSS × EPSS × KEV bo‘yicha — bugun eng muhimi</p></div>
+            <a className="soc-panel-link" href="/exposure">Barchasi <ArrowUpRight size={13} /></a>
           </div>
-          <ThreatMap sources={sources} />
+          <div className="soc-exp-list">
+            {topExposures.map((exp, index) => (
+              <a href="/exposure" className="soc-exp-row" key={exp.id}>
+                <span className="soc-exp-rank">{index + 1}</span>
+                <span className={`soc-exp-risk ${riskClass(exp.risk_score)}`}>{exp.risk_score}</span>
+                <div className="soc-exp-copy">
+                  <b>{exp.cve_id}</b>
+                  <span>{exp.agent_id}</span>
+                </div>
+                <div className="soc-exp-tags">
+                  {exp.cvss_score != null && <em className="soc-exp-tag">CVSS {exp.cvss_score.toFixed(1)}</em>}
+                  {exp.epss_score != null && <em className="soc-exp-tag">EPSS {Math.round(exp.epss_score * 100)}%</em>}
+                  {exp.known_exploited && <em className="soc-exp-tag kev">KEV</em>}
+                  {exp.active_threat && <em className="soc-exp-tag live">LIVE</em>}
+                </div>
+              </a>
+            ))}
+            {!topExposures.length && <div className="empty">Hozircha ekspozitsiya topilmadi. Agent ulang yoki demo maʼlumot yuklang.</div>}
+          </div>
         </div>
 
         <div className="soc-stack">
@@ -310,7 +295,14 @@ export default function Dashboard() {
 
       <section className="soc-bottom">
         <div className="soc-panel">
-          <div className="soc-panel-head"><div><h2>Hodisa faolligi ({timeRange})</h2><p>Persisted incident timestamp ma’lumotlari</p></div><Activity size={16} color="#1ed8ff" /></div>
+          <div className="soc-panel-head">
+            <div><h2>Hodisa faolligi ({timeRange})</h2><p>Persisted incident timestamp ma’lumotlari</p></div>
+            <div className="range">
+              {(['24H', '7D', '30D'] as TimeRange[]).map((range) => (
+                <button key={range} className={timeRange === range ? 'active' : ''} onClick={() => setTimeRange(range)}>{range}</button>
+              ))}
+            </div>
+          </div>
           <div className="soc-activity-body"><ActivityChart incidents={filtered} timeRange={timeRange} /></div>
         </div>
 

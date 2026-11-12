@@ -1,5 +1,5 @@
 """
-FastAPI Lifespan Manager for SentinelX.
+FastAPI Lifespan Manager for SanitialX.
 
 Architecture Invariant (architecture.md §15): explicit ordered startup/shutdown.
 """
@@ -40,7 +40,7 @@ async def _agent_offline_monitor(container: ApplicationContainer, *, timeout_sec
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
-    logger.info("Initializing SentinelX application lifecycle...")
+    logger.info("Initializing SanitialX application lifecycle...")
     app.state.is_ready = False
     settings = get_settings()
 
@@ -96,10 +96,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     )
 
     app.state.is_ready = True
-    logger.info("SentinelX application startup complete and READY.")
+    logger.info("SanitialX application startup complete and READY.")
     yield
 
-    logger.info("Initiating SentinelX application shutdown sequence...")
+    logger.info("Initiating SanitialX application shutdown sequence...")
     app.state.is_ready = False
 
     offline_monitor_task.cancel()
@@ -142,4 +142,4 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     except Exception as exc:
         logger.error("Error closing database: %s", exc)
 
-    logger.info("SentinelX application shutdown complete.")
+    logger.info("SanitialX application shutdown complete.")
