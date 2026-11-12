@@ -1,7 +1,7 @@
 'use client';
 
 import { FormEvent, useState } from 'react';
-import { Shield, ArrowRight, LockKeyhole } from 'lucide-react';
+import { ArrowRight, LockKeyhole } from 'lucide-react';
 import { login } from '@/lib/api';
 
 export default function LoginPage() {
@@ -46,16 +46,8 @@ export default function LoginPage() {
 
       <div className="login-card" style={{ zIndex: 1 }}>
         <div className="login-brand">
-          <div className="brand-mark">
-            <Shield size={22} />
-          </div>
-
-          <div>
-            <b>
-              SANITIEL<span>X</span>
-            </b>
-            <small>SECURITY PLATFORM</small>
-          </div>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/brand/sanitialx-logo-dark-transparent.svg" alt="SanitialX — AI Cyber Range & SIEM" className="login-logo" />
         </div>
 
         <div className="login-title">
