@@ -18,7 +18,8 @@ body{background-image:radial-gradient(circle at 72% 0,#07345355 0,transparent 26
 .app-grid{background:linear-gradient(135deg,#020912 0%,#04111d 48%,#020912 100%)}
 .sidebar{background:linear-gradient(180deg,#03111e 0%,#020b14 72%,#020912 100%)!important;border-right-color:#0e3147!important;box-shadow:18px 0 45px #0008}
 .brand{padding-bottom:18px!important}
-.brand-logo{background:linear-gradient(145deg,#0b3350,#0b6b8d)!important;border:1px solid #1fcfff66!important;box-shadow:0 0 30px #13d8ff33,inset 0 0 24px #0fb2ff22!important}
+.brand-logo{background:transparent!important;border:0!important;box-shadow:none!important;width:40px;height:40px;display:grid;place-items:center;filter:drop-shadow(0 0 10px #13d8ff44)}
+.brand-logo svg{width:40px;height:40px}
 .brand-text strong{letter-spacing:1.2px}.brand-text strong::after{content:'X';color:var(--soc-cyan)}
 .nav-group-title{color:#587c98!important;letter-spacing:1.05px!important}
 .nav-item{border:1px solid transparent!important;transition:.18s ease!important}

@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
-  Shield, Activity, AlertTriangle, FileText, Sliders, LogOut, Bell, X, Play, Cpu,
+  Activity, AlertTriangle, FileText, Sliders, LogOut, Bell, X, Play, Cpu,
   Layers, Zap, Radio, Share2, Crosshair, Box, Brain, CheckCircle2, Loader2,
   BookOpen, ScrollText, Bug, ChevronRight, ShieldAlert,
 } from 'lucide-react';
@@ -130,7 +130,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     <div className="app-grid">
       <aside className="sidebar">
         <div className="brand">
-          <div className="brand-logo"><Shield size={20} color="#00e5ff" /></div>
+          <div className="brand-logo" aria-hidden="true">
+            <svg viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+              <path d="M256 48 L416 104 V240 C416 340 344 416 256 464 C168 416 96 340 96 240 V104 Z" fill="#0C1526" stroke="#00E5FF" strokeWidth="26" strokeLinejoin="round" />
+              <line x1="154" y1="160" x2="366" y2="160" stroke="#00E5FF" strokeWidth="28" strokeLinecap="round" />
+              <line x1="154" y1="214" x2="314" y2="214" stroke="#3FD9EE" strokeOpacity="0.24" strokeWidth="28" strokeLinecap="round" />
+              <line x1="154" y1="268" x2="270" y2="268" stroke="#3FD9EE" strokeOpacity="0.24" strokeWidth="28" strokeLinecap="round" />
+              <line x1="154" y1="322" x2="226" y2="322" stroke="#3FD9EE" strokeOpacity="0.24" strokeWidth="28" strokeLinecap="round" />
+            </svg>
+          </div>
           <div className="brand-text"><strong>SANITIAL</strong><small>AI CYBER RANGE &amp; SIEM</small></div>
         </div>
 
