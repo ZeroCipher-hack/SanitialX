@@ -1,0 +1,23 @@
+/* Sidebar motion: staggered entrance, hover shimmer, animated active marker, edge scanner. */
+.sidebar{position:fixed;overflow:hidden}
+.sidebar::after{content:'';position:absolute;top:0;right:0;width:1px;height:100%;background:linear-gradient(180deg,transparent,#12d8ff,transparent);background-size:100% 30%;background-repeat:no-repeat;animation:sb-scan 5.5s ease-in-out infinite;pointer-events:none;opacity:.8}
+.brand-logo{animation:sb-logo 3.6s ease-in-out infinite}
+.sidebar .nav-item{position:relative;overflow:hidden;opacity:0;animation:sb-in .5s ease-out forwards}
+.sidebar .nav-item:nth-of-type(1){animation-delay:.05s}.sidebar .nav-item:nth-of-type(2){animation-delay:.1s}.sidebar .nav-item:nth-of-type(3){animation-delay:.15s}
+.sidebar .nav-item:nth-of-type(4){animation-delay:.2s}.sidebar .nav-item:nth-of-type(5){animation-delay:.25s}.sidebar .nav-item:nth-of-type(6){animation-delay:.3s}
+.sidebar .nav-item:nth-of-type(7){animation-delay:.35s}.sidebar .nav-item:nth-of-type(8){animation-delay:.4s}.sidebar .nav-item:nth-of-type(9){animation-delay:.45s}
+.sidebar .nav-item:nth-of-type(n+10){animation-delay:.5s}
+.sidebar .nav-item::before{content:'';position:absolute;inset:0;background:linear-gradient(100deg,transparent 30%,#12d8ff2e 50%,transparent 70%);transform:translateX(-120%);pointer-events:none}
+.sidebar .nav-item:hover::before{transform:translateX(120%);transition:transform .7s ease}
+.sidebar .nav-item svg{transition:transform .25s ease,color .2s,filter .2s}
+.sidebar .nav-item:hover svg{transform:scale(1.18) rotate(-6deg);color:var(--soc-cyan);filter:drop-shadow(0 0 6px #13d8ff88)}
+.sidebar .nav-item.active{animation:sb-in .5s ease-out forwards,sb-glow 3s ease-in-out .6s infinite}
+.sidebar .nav-item.active::after{content:'';position:absolute;right:10px;top:50%;width:6px;height:6px;margin-top:-3px;border-radius:50%;background:var(--soc-cyan);box-shadow:0 0 10px var(--soc-cyan);animation:sb-dot 1.8s ease-in-out infinite}
+.sidebar .nav-group-title{display:flex;align-items:center;gap:8px}
+.sidebar .nav-group-title::after{content:'';flex:1;height:1px;background:linear-gradient(90deg,#12344a,transparent)}
+@keyframes sb-in{from{opacity:0;transform:translateX(-14px)}to{opacity:1;transform:none}}
+@keyframes sb-scan{0%{background-position:0 -40%}100%{background-position:0 140%}}
+@keyframes sb-logo{50%{box-shadow:0 0 44px #13d8ff77,inset 0 0 24px #0fb2ff44}}
+@keyframes sb-glow{50%{box-shadow:inset 3px 0 var(--soc-cyan),0 0 30px #00cfff33}}
+@keyframes sb-dot{50%{transform:scale(1.7);opacity:.5}}
+@media(prefers-reduced-motion:reduce){.sidebar::after,.brand-logo,.sidebar .nav-item,.sidebar .nav-item.active,.sidebar .nav-item.active::after{animation:none!important;opacity:1!important}.sidebar .nav-item::before{display:none}}

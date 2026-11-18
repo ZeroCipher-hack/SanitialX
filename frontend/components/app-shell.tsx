@@ -117,7 +117,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <aside className="sidebar">
         <div className="brand">
           <div className="brand-logo"><Shield size={20} color="#00e5ff" /></div>
-          <div className="brand-text"><strong>SANITIALX</strong><small>AI CYBER RANGE & SIEM</small></div>
+          <div className="brand-text"><strong>SANITIAL</strong><small>AI CYBER RANGE & SIEM</small></div>
         </div>
 
         <nav className="nav" aria-label="Asosiy navigatsiya">
