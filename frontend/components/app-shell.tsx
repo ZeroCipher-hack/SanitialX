@@ -59,7 +59,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   };
 
   useEffect(() => {
-    if (pathname === '/login') return;
+    if (pathname === '/login' || pathname === '/' || pathname === '/pricing') return;
     loadNotifications();
     const interval = setInterval(loadNotifications, 15000);
     return () => clearInterval(interval);
@@ -101,7 +101,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     router.push(`/vulnerabilities?cve=${encodeURIComponent(alert.cve_id)}&agent_id=${encodeURIComponent(alert.agent_id)}`);
   };
 
-  if (pathname === '/login') return <>{children}</>;
+  if (pathname === '/login' || pathname === '/' || pathname === '/pricing') return <>{children}</>;
 
   const activeIncidentsCount = incidents.filter((x) => x.status === 'OPEN' || x.status === 'INVESTIGATING').length;
   const totalNotificationCount = activeIncidentsCount + vulnerabilityAlerts.length;
