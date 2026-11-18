@@ -4,14 +4,14 @@ import { Shield } from 'lucide-react';
 export function LandingNav() {
   return (
     <header className="lp-nav">
-      <Link href="/" className="lp-logo"><span className="lp-logo-mark"><Shield size={18} /></span>SANITIAL<b>X</b></Link>
+      <Link href="/" className="lp-logo"><span className="lp-logo-mark"><Shield size={18} /></span><span>SANITIAL<b>X</b></span></Link>
       <nav className="lp-nav-links">
         <a href="/#features">Imkoniyatlar</a>
         <a href="/#flow">Qanday ishlaydi</a>
         <Link href="/pricing">Narxlar</Link>
       </nav>
       <div className="lp-nav-cta">
-        <Link href="/login" className="lp-btn ghost">Kirish</Link>
+        <Link href="/login" className="lp-btn outline">Kirish</Link>
         <Link href="/pricing" className="lp-btn primary">Boshlash</Link>
       </div>
     </header>

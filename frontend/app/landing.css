@@ -14,7 +14,7 @@
 .lp-btn{display:inline-flex;align-items:center;gap:8px;padding:9px 18px;border-radius:10px;font-weight:600;border:1px solid transparent;transition:transform .2s,box-shadow .2s,background .2s;cursor:pointer}
 .lp-btn.lg{padding:13px 26px}.lp-btn:hover{transform:translateY(-2px)}
 .lp-btn.primary{background:linear-gradient(135deg,var(--c),var(--b));color:#021018;box-shadow:0 8px 30px #12d8ff44}.lp-btn.primary:hover{box-shadow:0 12px 40px #12d8ff77}
-.lp-btn.ghost{border-color:#1b4a66;color:#cfeaf6;background:#06182766}.lp-btn.ghost:hover{background:#0a2a40}
+.lp-btn.outline{border-color:#1b4a66;color:#cfeaf6;background:#06182766}.lp-btn.outline:hover{background:#0a2a40}
 .lp-hero{display:grid;grid-template-columns:1.1fr .9fr;align-items:center;gap:40px;padding:clamp(40px,8vw,110px) clamp(16px,5vw,64px) 60px}
 .lp-badge{display:inline-flex;align-items:center;gap:8px;padding:6px 14px;border:1px solid #1b4a66;border-radius:99px;background:#06182788;color:var(--c);font-size:13px;animation:lp-up .8s both}
 .lp-hero h1{font-size:clamp(34px,5.4vw,68px);line-height:1.05;margin:20px 0;font-weight:800;letter-spacing:-1px;animation:lp-up .8s .1s both}
@@ -61,4 +61,5 @@
 @keyframes lp-float{50%{transform:translate(40px,30px)}}
 @keyframes lp-marquee{to{transform:translateX(-50%)}}
 @media(max-width:860px){.lp-hero{grid-template-columns:1fr}.lp-radar{order:-1;width:min(70%,300px)}.lp-nav-links{display:none}}
+@media(max-width:520px){.lp-nav-cta .outline{display:none}.lp-btn.lg{padding:12px 20px}}
 @media(prefers-reduced-motion:reduce){.lp *,.lp-grid,.lp-orb{animation:none!important;transition:none!important}.lp-reveal{opacity:1;transform:none}}

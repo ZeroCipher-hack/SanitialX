@@ -39,7 +39,7 @@ export default function LandingPage() {
           <p>SanitialX tarmoq hodisalarini yig&apos;adi, tahdidlarni korrelyatsiya qiladi va tasdiqlanadigan avtomatik javobni boshqaradi. Bir paneldan.</p>
           <div className="lp-hero-cta">
             <Link href="/login" className="lp-btn primary lg">Panelga kirish <ArrowRight size={16} /></Link>
-            <Link href="/pricing" className="lp-btn ghost lg">Narxlarni ko&apos;rish</Link>
+            <Link href="/pricing" className="lp-btn outline lg">Narxlarni ko&apos;rish</Link>
           </div>
         </div>
         <div className="lp-radar" aria-hidden>

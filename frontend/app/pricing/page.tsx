@@ -24,7 +24,7 @@ export default function PricingPage() {
               {p.hot && <span className="lp-plan-tag">Mashhur</span>}
               <h3>{p.name}</h3><div className="lp-price">{p.price}</div><p>{p.note}</p>
               <ul>{p.items.map((it) => <li key={it}><Check size={15} />{it}</li>)}</ul>
-              <Link href="/login" className={`lp-btn ${p.hot ? 'primary' : 'ghost'} lg`}>Boshlash</Link>
+              <Link href="/login" className={`lp-btn ${p.hot ? 'primary' : 'outline'} lg`}>Boshlash</Link>
             </article>
           </Reveal>
         ))}
