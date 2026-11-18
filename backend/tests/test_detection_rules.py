@@ -9,6 +9,7 @@ from correlation.enums import Severity
 from correlation.rules.honeypot import HoneypotDetectionRule
 from correlation.rules.port_scan import PortScanDetectionRule
 from correlation.rules.rdp_bruteforce import RDPBruteForceDetectionRule
+from correlation.rules.smb_lateral import SMBLateralMovementDetectionRule
 from correlation.rules.ssh_bruteforce import SSHBruteForceDetectionRule
 from correlation.state import InMemoryCorrelationStateStore
 from events.models import NormalizedEvent
@@ -127,6 +128,27 @@ class TestRDPBruteForceDetectionRule:
 
         for _ in range(3):
             assert rule.evaluate(_make_event(src="4.4.4.4", dport=22), store) == []
+
+
+class TestSMBLateralMovementDetectionRule:
+    def test_triggers_on_attempt_threshold(self) -> None:
+        rule = SMBLateralMovementDetectionRule(attempt_threshold=3, window_seconds=60)
+        store = InMemoryCorrelationStateStore()
+
+        for _ in range(2):
+            assert rule.evaluate(_make_event(src="5.5.5.5", dport=445), store) == []
+
+        detections = rule.evaluate(_make_event(src="5.5.5.5", dport=445), store)
+        assert len(detections) == 1
+        assert detections[0].source_ip == "5.5.5.5"
+        assert detections[0].context["mitre_technique"] == "T1021.002"
+
+    def test_ignores_non_smb_ports(self) -> None:
+        rule = SMBLateralMovementDetectionRule(attempt_threshold=2, window_seconds=60)
+        store = InMemoryCorrelationStateStore()
+
+        for _ in range(3):
+            assert rule.evaluate(_make_event(src="5.5.5.5", dport=80), store) == []
 
 
 class TestHoneypotDetectionRule:
