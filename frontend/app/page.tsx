@@ -43,8 +43,16 @@ export default function LandingPage() {
           </div>
         </div>
         <div className="lp-radar" aria-hidden>
-          <i className="ring r1" /><i className="ring r2" /><i className="ring r3" /><i className="sweep" />
+          <i className="ring r1" /><i className="ring r2" /><i className="ring r3" />
+          <i className="ticks" /><i className="dash" />
+          <i className="cross h" /><i className="cross v" />
+          <i className="sweep" />
+          <i className="orbit o1"><b /></i><i className="orbit o2"><b /></i><i className="orbit o3"><b /></i>
+          <svg className="links" viewBox="0 0 100 100"><path d="M50 50 L66 24 M50 50 L26 66 M50 50 L70 72" /></svg>
           <i className="blip b1" /><i className="blip b2" /><i className="blip b3" />
+          <span className="chip c1"><i className="dot red" />SSH brute-force<small>BLOKLANDI</small></span>
+          <span className="chip c2"><i className="dot yel" />Port scan<small>TEKSHIRUVDA</small></span>
+          <span className="chip c3"><i className="dot grn" />SMB harakati<small>TASDIQ KUTILMOQDA</small></span>
           <span className="core"><ShieldCheck size={30} /></span>
         </div>
       </section>

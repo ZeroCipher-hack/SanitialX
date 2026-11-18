@@ -20,12 +20,26 @@
 .lp-hero h1{font-size:clamp(34px,5.4vw,68px);line-height:1.05;margin:20px 0;font-weight:800;letter-spacing:-1px;animation:lp-up .8s .1s both}
 .lp-hero p{font-size:clamp(16px,1.6vw,19px);color:#8fb3c7;max-width:560px;line-height:1.6;animation:lp-up .8s .2s both}
 .lp-hero-cta{display:flex;flex-wrap:wrap;gap:14px;margin-top:30px;animation:lp-up .8s .3s both}
-.lp-radar{position:relative;width:min(100%,430px);aspect-ratio:1;margin:auto;animation:lp-up 1s .2s both}
+.lp-radar{position:relative;width:min(88%,430px);aspect-ratio:1;margin:auto;animation:lp-up 1s .2s both}
 .lp-radar .ring{position:absolute;inset:0;border-radius:50%;border:1px solid #12d8ff44;margin:auto}
 .lp-radar .r1{inset:0}.lp-radar .r2{inset:16%}.lp-radar .r3{inset:33%}
-.lp-radar .sweep{position:absolute;inset:0;border-radius:50%;background:conic-gradient(from 0deg,#12d8ff66,transparent 28%);animation:lp-spin 4.5s linear infinite;mask-image:radial-gradient(circle,#000 68%,transparent 70%)}
+.lp-radar .sweep{position:absolute;inset:0;border-radius:50%;background:conic-gradient(from 0deg,#12d8ffaa,#12d8ff22 14%,transparent 30%);animation:lp-spin 4.5s linear infinite;mask-image:radial-gradient(circle,#000 68%,transparent 70%)}
 .lp-radar .blip{position:absolute;width:10px;height:10px;border-radius:50%;background:#ff405c;box-shadow:0 0 14px #ff405c;animation:lp-ping 2.4s ease-out infinite}
 .lp-radar .b1{top:22%;left:64%}.lp-radar .b2{top:62%;left:24%;animation-delay:-.9s}.lp-radar .b3{top:70%;left:68%;background:#ffd05a;box-shadow:0 0 14px #ffd05a;animation-delay:-1.6s}
+.lp-radar .ticks{position:absolute;inset:-3%;border-radius:50%;background:repeating-conic-gradient(#12d8ff66 0 .6deg,transparent .6deg 6deg);mask-image:radial-gradient(circle,transparent 66%,#000 67%,#000 70%,transparent 71%);animation:lp-spin 60s linear infinite reverse}
+.lp-radar .dash{position:absolute;inset:8%;border-radius:50%;border:1px dashed #8c65ff77;animation:lp-spin 40s linear infinite}
+.lp-radar .cross{position:absolute;background:#12d8ff22}.lp-radar .cross.h{left:0;right:0;top:50%;height:1px}.lp-radar .cross.v{top:0;bottom:0;left:50%;width:1px}
+.lp-radar .orbit{position:absolute;border-radius:50%;animation:lp-spin linear infinite}
+.lp-radar .orbit b{position:absolute;top:-4px;left:50%;width:8px;height:8px;margin-left:-4px;border-radius:50%;background:var(--c);box-shadow:0 0 12px var(--c)}
+.lp-radar .o1{inset:16%;animation-duration:9s}.lp-radar .o2{inset:33%;animation-duration:6s;animation-direction:reverse}.lp-radar .o2 b{background:var(--p);box-shadow:0 0 12px var(--p)}
+.lp-radar .o3{inset:-2%;animation-duration:22s}.lp-radar .o3 b{width:6px;height:6px;background:#fff;box-shadow:0 0 10px #fff}
+.lp-radar .links{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+.lp-radar .links path{fill:none;stroke:#ff405c88;stroke-width:.35;stroke-dasharray:2 2;animation:lp-dash 1.6s linear infinite}
+.lp-radar .chip{position:absolute;display:flex;flex-direction:column;gap:2px;padding:8px 12px;border:1px solid #1b4a66;border-radius:10px;background:#061421ee;backdrop-filter:blur(8px);font-size:12px;font-weight:600;white-space:nowrap;box-shadow:0 10px 30px #0008;animation:lp-bob 5s ease-in-out infinite}
+.lp-radar .chip small{font-size:9px;letter-spacing:1.2px;color:#6fa0b8;font-weight:500}
+.lp-radar .chip .dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:7px;animation:lp-blink 1.4s infinite}
+.lp-radar .dot.red{background:#ff405c}.lp-radar .dot.yel{background:#ffd05a}.lp-radar .dot.grn{background:#19e39a}
+.lp-radar .c1{top:6%;right:-8%}.lp-radar .c2{bottom:12%;left:-10%;animation-delay:-1.7s}.lp-radar .c3{bottom:-4%;right:-2%;animation-delay:-3.2s}
 .lp-radar .core{position:absolute;inset:0;margin:auto;width:76px;height:76px;border-radius:50%;display:grid;place-items:center;background:#06182799;border:1px solid #1fcfff88;color:var(--c);box-shadow:0 0 40px #12d8ff55;animation:lp-pulse 3s ease-in-out infinite}
 .lp-marquee{overflow:hidden;border-block:1px solid #10344a88;background:#04101c99;padding:14px 0;white-space:nowrap}
 .lp-marquee-track{display:inline-flex;animation:lp-marquee 28s linear infinite;color:#4f7c96;letter-spacing:2px;font-size:13px}.lp-marquee-track span{padding-right:0}
@@ -55,11 +69,14 @@
 .lp-reveal{opacity:0;transform:translateY(28px);transition:opacity .7s ease,transform .7s ease}.lp-reveal.in{opacity:1;transform:none}
 @keyframes lp-up{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:none}}
 @keyframes lp-spin{to{transform:rotate(360deg)}}
+@keyframes lp-dash{to{stroke-dashoffset:-8}}
+@keyframes lp-bob{50%{transform:translateY(-9px)}}
+@keyframes lp-blink{50%{opacity:.25}}
 @keyframes lp-ping{0%{transform:scale(.6);opacity:1}70%,100%{transform:scale(2.2);opacity:.15}}
 @keyframes lp-pulse{50%{box-shadow:0 0 70px #12d8ff88}}
 @keyframes lp-grid{to{transform:translateY(56px)}}
 @keyframes lp-float{50%{transform:translate(40px,30px)}}
 @keyframes lp-marquee{to{transform:translateX(-50%)}}
 @media(max-width:860px){.lp-hero{grid-template-columns:1fr}.lp-radar{order:-1;width:min(70%,300px)}.lp-nav-links{display:none}}
-@media(max-width:520px){.lp-nav-cta .outline{display:none}.lp-btn.lg{padding:12px 20px}}
+@media(max-width:520px){.lp-radar .chip{font-size:10px;padding:6px 9px}.lp-radar .c1{right:-2%}.lp-radar .c2{left:-2%}.lp-radar .c3{right:2%}.lp-nav-cta .outline{display:none}.lp-btn.lg{padding:12px 20px}}
 @media(prefers-reduced-motion:reduce){.lp *,.lp-grid,.lp-orb{animation:none!important;transition:none!important}.lp-reveal{opacity:1;transform:none}}
