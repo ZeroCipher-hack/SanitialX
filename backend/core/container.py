@@ -19,6 +19,7 @@ from correlation.redis_state import RedisCorrelationStateStore
 from correlation.rule_runtime import DetectionRuleRuntimeManager
 from correlation.rules.honeypot import HoneypotDetectionRule
 from correlation.rules.port_scan import PortScanDetectionRule
+from correlation.rules.rdp_bruteforce import RDPBruteForceDetectionRule
 from correlation.rules.ssh_bruteforce import SSHBruteForceDetectionRule
 from correlation.sequence import DetectionSequenceRule, SequenceStage
 from correlation.state import CorrelationStateStore, InMemoryCorrelationStateStore
@@ -93,6 +94,7 @@ class ApplicationContainer:
             rules=[
                 PortScanDetectionRule(),
                 SSHBruteForceDetectionRule(),
+                RDPBruteForceDetectionRule(),
                 HoneypotDetectionRule(),
             ],
             sequence_rules=[

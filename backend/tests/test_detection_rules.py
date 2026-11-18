@@ -8,6 +8,7 @@ import pytest
 from correlation.enums import Severity
 from correlation.rules.honeypot import HoneypotDetectionRule
 from correlation.rules.port_scan import PortScanDetectionRule
+from correlation.rules.rdp_bruteforce import RDPBruteForceDetectionRule
 from correlation.rules.ssh_bruteforce import SSHBruteForceDetectionRule
 from correlation.state import InMemoryCorrelationStateStore
 from events.models import NormalizedEvent
@@ -105,6 +106,27 @@ class TestSSHBruteForceDetectionRule:
         d2 = rule.evaluate(_make_event(src="2.2.2.2", dport=80), store)
         assert len(d1) == 0
         assert len(d2) == 0
+
+
+class TestRDPBruteForceDetectionRule:
+    def test_triggers_on_attempt_threshold(self) -> None:
+        rule = RDPBruteForceDetectionRule(attempt_threshold=3, window_seconds=60)
+        store = InMemoryCorrelationStateStore()
+
+        for _ in range(2):
+            assert rule.evaluate(_make_event(src="4.4.4.4", dport=3389), store) == []
+
+        detections = rule.evaluate(_make_event(src="4.4.4.4", dport=3389), store)
+        assert len(detections) == 1
+        assert detections[0].source_ip == "4.4.4.4"
+        assert detections[0].context["attempts_count"] == 3
+
+    def test_ignores_non_rdp_ports(self) -> None:
+        rule = RDPBruteForceDetectionRule(attempt_threshold=2, window_seconds=60)
+        store = InMemoryCorrelationStateStore()
+
+        for _ in range(3):
+            assert rule.evaluate(_make_event(src="4.4.4.4", dport=22), store) == []
 
 
 class TestHoneypotDetectionRule:
