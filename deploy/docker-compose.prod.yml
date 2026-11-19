@@ -1,0 +1,117 @@
+# SanitialX production stack. Only Caddy publishes ports (80/443); the database, Redis and API stay internal.
+# Usage (from this directory): ./setup.sh   then   docker compose -f docker-compose.prod.yml up -d --build
+
+x-backend: &backend
+  build:
+    context: ../backend
+    dockerfile: Dockerfile
+  restart: unless-stopped
+  environment: &backend-env
+    SENTINELX_ENVIRONMENT: production
+    SENTINELX_LOG_LEVEL: ${SENTINELX_LOG_LEVEL:-INFO}
+    SENTINELX_REDIS_URL: redis://redis:6379/0
+    SENTINELX_DATABASE_URL: postgresql+asyncpg://sentinelx:${POSTGRES_PASSWORD:?run ./setup.sh first}@postgres:5432/sentinelx
+    SENTINELX_API_KEY: ${SENTINELX_API_KEY:?run ./setup.sh first}
+    SENTINELX_JWT_SECRET_KEY: ${SENTINELX_JWT_SECRET_KEY:?run ./setup.sh first}
+    SENTINELX_FRONTEND_ORIGIN: ${PUBLIC_URL:?run ./setup.sh first}
+    SENTINELX_LICENSE_PUBLIC_KEY: ${SENTINELX_LICENSE_PUBLIC_KEY:-}
+    SENTINELX_LICENSE_FILE: /data/license/license.json
+    SENTINELX_GEMINI_API_KEY: ${SENTINELX_GEMINI_API_KEY:-}
+  volumes:
+    - license_data:/data/license
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: sentinelx
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?run ./setup.sh first}
+      POSTGRES_DB: sentinelx
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sentinelx -d sentinelx"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  migrate:
+    <<: *backend
+    restart: "no"
+    command: alembic upgrade head
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  backend:
+    <<: *backend
+    command: uvicorn main:create_app --factory --host 0.0.0.0 --port 8000
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/api/v1/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    depends_on:
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+      migrate: {condition: service_completed_successfully}
+
+  worker:
+    <<: *backend
+    command: python scripts/run_worker.py
+    depends_on:
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+      migrate: {condition: service_completed_successfully}
+
+  vulnerability-scheduler:
+    <<: *backend
+    command: python scripts/run_vulnerability_scheduler.py
+    depends_on:
+      postgres: {condition: service_healthy}
+      migrate: {condition: service_completed_successfully}
+
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${PUBLIC_URL:?run ./setup.sh first}/api/v1
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      SITE_ADDRESS: ${SITE_ADDRESS:?run ./setup.sh first}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - backend
+      - frontend
+
+volumes:
+  postgres_data:
+  redis_data:
+  license_data:
+  caddy_data:
+  caddy_config:

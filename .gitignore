@@ -31,3 +31,7 @@ Thumbs.db
 .idea/
 marketing/**/out/
 marketing/**/shots/
+deploy/.env
+deploy/backups/
+marketing/deck/assets/*.mp4
+marketing/deck/out/

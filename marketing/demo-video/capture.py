@@ -44,7 +44,7 @@ try:
                     raise RuntimeError(msg["error"])
                 return msg["result"]
 
-    call("Emulation.setDeviceMetricsOverride", width=1440, height=900, deviceScaleFactor=1, mobile=False)
+    call("Emulation.setDeviceMetricsOverride", width=1440, height=900, deviceScaleFactor=2, mobile=False)
     call("Page.navigate", url=BASE + "/login")
     time.sleep(3)
     call("Runtime.evaluate", expression=f"localStorage.setItem('access_token','{token}')")
