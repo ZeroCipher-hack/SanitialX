@@ -3,12 +3,13 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
-  Shield, Activity, AlertTriangle, FileText, Sliders, LogOut, Bell, X, Play, Cpu,
+  Activity, AlertTriangle, FileText, Sliders, LogOut, Bell, X, Play, Cpu,
   Layers, Zap, Radio, Share2, Crosshair, Box, Brain, CheckCircle2, Loader2,
   BookOpen, ScrollText, Bug, ChevronRight, LifeBuoy, Megaphone, KeyRound,
 } from 'lucide-react';
 import { useEffect, useState, useRef } from 'react';
 import { api, logout, runAttackSimulation } from '@/lib/api';
+import { LogoMark } from '@/components/brand/logo-mark';
 import type { Incident } from '@/types/api';
 
 type VulnerabilityAlert = {
@@ -116,8 +117,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     <div className="app-grid">
       <aside className="sidebar">
         <div className="brand">
-          <div className="brand-logo"><Shield size={20} color="#00e5ff" /></div>
-          <div className="brand-text"><strong>SANITIAL</strong><small>AI CYBER RANGE & SIEM</small></div>
+          <div className="brand-logo"><LogoMark size={26} simple /></div>
+          <div className="brand-text"><strong>SANITIAL</strong><small>BY TOLQIN AKRAMOV</small></div>
         </div>
 
         <nav className="nav" aria-label="Asosiy navigatsiya">

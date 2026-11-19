@@ -1,7 +1,8 @@
 'use client';
 
 import { FormEvent, useState } from 'react';
-import { Shield, ArrowRight, LockKeyhole } from 'lucide-react';
+import { ArrowRight, LockKeyhole } from 'lucide-react';
+import { LogoMark } from '@/components/brand/logo-mark';
 import { login } from '@/lib/api';
 
 export default function LoginPage() {
@@ -47,14 +48,14 @@ export default function LoginPage() {
       <div className="login-card" style={{ zIndex: 1 }}>
         <div className="login-brand">
           <div className="brand-mark">
-            <Shield size={22} />
+            <LogoMark size={26} simple />
           </div>
 
           <div>
             <b>
-              SANITIEL<span>X</span>
+              SANITIAL<span>X</span>
             </b>
-            <small>SECURITY PLATFORM</small>
+            <small>BY TOLQIN AKRAMOV</small>
           </div>
         </div>
 
