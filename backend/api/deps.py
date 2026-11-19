@@ -111,6 +111,14 @@ async def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
+    valid_after = await container.redis_client.get(f"user_valid_after:{payload.sub}")
+    if valid_after is not None and payload.iat <= int(valid_after):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Session is no longer valid. Please sign in again.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
     return payload
 
 

@@ -12,6 +12,15 @@ import type {
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 
+/** FastAPI returns `detail` as a string, or as a list of validation errors for 422. */
+function formatDetail(detail: unknown): string {
+  if (typeof detail === 'string') return detail;
+  if (Array.isArray(detail)) {
+    return detail.map((d) => (d && typeof d === 'object' && 'msg' in d ? String((d as { msg: unknown }).msg) : String(d))).join('; ');
+  }
+  return '';
+}
+
 export async function api<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
   const headers = new Headers(options.headers || {});
@@ -30,7 +39,7 @@ export async function api<T>(endpoint: string, options: RequestInit = {}): Promi
       localStorage.removeItem('access_token');
     }
     const errData = await res.json().catch(() => ({ detail: res.statusText }));
-    throw new Error(errData.detail || `API error: ${res.status}`);
+    throw new Error(formatDetail(errData.detail) || `API error: ${res.status}`);
   }
 
   return res.json();

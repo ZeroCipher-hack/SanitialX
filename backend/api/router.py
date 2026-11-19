@@ -23,6 +23,7 @@ from api.vulnerability_alerts import router as vulnerability_alerts_router
 from api.soar import router as soar_router
 from api.support import router as support_router
 from api.license import router as license_router
+from api.users import router as users_router
 
 api_v1_router = APIRouter(prefix="/api/v1")
 
@@ -41,3 +42,4 @@ api_v1_router.include_router(vulnerability_alerts_router)
 api_v1_router.include_router(soar_router)
 api_v1_router.include_router(support_router)
 api_v1_router.include_router(license_router)
+api_v1_router.include_router(users_router)

@@ -98,6 +98,8 @@ docker compose -f docker-compose.prod.yml exec backend python -m scripts.create_
 
 Parolni ikki marta kiritasiz (kamida 8 belgi; ekranda ko'rinmaydi).
 
+Keyingi xodimlarni terminalsiz, panelning **Foydalanuvchilar** sahifasidan qo'shasiz (administrator): yaratish, rolni o'zgartirish, parolni tiklash, kirishni o'chirib qo'yish. Oxirgi administratorni o'chirib bo'lmaydi.
+
 Endi brauzerda oching: `https://soc.sizning-domen.uz` (yoki `http://SERVER_IP`) → **Kirish**.
 
 ## 7. Tekshirish ro'yxati
@@ -159,6 +161,5 @@ Ochiq kalit berilmasa, litsenziya cheklovi **ishlamaydi** (yangi agentlar chekla
 ## 12. Hozircha ma'lum cheklovlar (halol ro'yxat)
 
 - Production Docker qurilishi **men tomondan serverda sinalmagan**: frontend production build va konfiguratsiya tekshirilgan, lekin birinchi `up --build` ni haqiqiy VPS'da kuzatish kerak.
-- Panelda foydalanuvchilarni boshqarish sahifasi hali yo'q: yangi foydalanuvchi faqat yuqoridagi `create_user` buyrug'i bilan yaratiladi.
 - AI tahlil sukut bo'yicha o'chiq (`SENTINELX_GEMINI_API_KEY` bo'sh). Yoqilsa, hodisa matni Google'ga yuboriladi.
 - Agentlar ulanishida tarmoq sniffer (Scapy) konteyner ichida cheklangan huquq bilan ishlamaydi; hodisalar asosan agentlar orqali keladi.

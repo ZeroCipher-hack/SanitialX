@@ -5,11 +5,12 @@ import { usePathname, useRouter } from 'next/navigation';
 import {
   Activity, AlertTriangle, FileText, Sliders, LogOut, Bell, X, Play, Cpu,
   Layers, Zap, Radio, Share2, Crosshair, Box, Brain, CheckCircle2, Loader2,
-  BookOpen, ScrollText, Bug, ChevronRight, LifeBuoy, Megaphone, KeyRound,
+  BookOpen, ScrollText, Bug, ChevronRight, LifeBuoy, Megaphone, KeyRound, Users,
 } from 'lucide-react';
 import { useEffect, useState, useRef } from 'react';
 import { api, logout, runAttackSimulation } from '@/lib/api';
 import { LogoMark } from '@/components/brand/logo-mark';
+import { currentRole } from '@/lib/session';
 import type { Incident } from '@/types/api';
 
 type VulnerabilityAlert = {
@@ -28,6 +29,8 @@ type VulnerabilityAlert = {
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const [isAdmin, setIsAdmin] = useState(false);
+  useEffect(() => { setIsAdmin(currentRole() === 'admin'); }, [pathname]);
   const router = useRouter();
   const [incidents, setIncidents] = useState<Incident[]>([]);
   const [vulnerabilityAlerts, setVulnerabilityAlerts] = useState<VulnerabilityAlert[]>([]);
@@ -155,6 +158,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           {item('/support', 'Yordam markazi', <LifeBuoy size={17} />)}
           {item('/news', 'Yangiliklar', <Megaphone size={17} />)}
           {item('/license', 'Litsenziya', <KeyRound size={17} />)}
+          {isAdmin && item('/users', 'Foydalanuvchilar', <Users size={17} />)}
         </nav>
 
         <div className="sidebar-footer">

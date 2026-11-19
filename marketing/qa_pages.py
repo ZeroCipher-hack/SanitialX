@@ -14,7 +14,7 @@ agents = json.load(urllib.request.urlopen(urllib.request.Request(API + "/agents"
 agent = agents[0]["agent_id"]
 PAGES = ["/", "/pricing", "/dashboard", "/events", "/incidents", f"/incidents?id={inc}", "/logs", "/rules", "/techniques",
          "/vulnerabilities", "/agents", f"/agents/{agent}", "/assets", "/honeypots", "/simulations",
-         f"/attack-graph?incident_id={inc}", "/ai-analysis", "/reports", "/threats", "/guide", "/support", "/news", "/license"]
+         f"/attack-graph?incident_id={inc}", "/ai-analysis", "/reports", "/threats", "/guide", "/support", "/news", "/license", "/users"]
 if len(sys.argv) > 1:
     PAGES = sys.argv[1:]
 

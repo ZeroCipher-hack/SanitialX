@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from datetime import timezone
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -62,5 +62,44 @@ class PostgresUserRepository(UserRepository):
             except IntegrityError as exc:
                 await session.rollback()
                 raise ValidationError(f"Username '{user.username}' is already taken.") from exc
+            await session.refresh(orm)
+            return _orm_to_domain(orm)
+
+    async def list_all(self) -> list[User]:
+        async with self._session_factory() as session:
+            result = await session.execute(select(UserORM).order_by(UserORM.created_at, UserORM.username))
+            return [_orm_to_domain(orm) for orm in result.scalars()]
+
+    async def get_by_id(self, user_id: str) -> User | None:
+        async with self._session_factory() as session:
+            orm = await session.get(UserORM, user_id)
+            return _orm_to_domain(orm) if orm is not None else None
+
+    async def count_active_admins(self) -> int:
+        async with self._session_factory() as session:
+            result = await session.execute(
+                select(func.count()).select_from(UserORM).where(UserORM.role == "admin", UserORM.is_active.is_(True))
+            )
+            return int(result.scalar_one())
+
+    async def update(
+        self,
+        user_id: str,
+        *,
+        role: str | None = None,
+        is_active: bool | None = None,
+        password_hash: str | None = None,
+    ) -> User | None:
+        async with self._session_factory() as session:
+            orm = await session.get(UserORM, user_id)
+            if orm is None:
+                return None
+            if role is not None:
+                orm.role = role
+            if is_active is not None:
+                orm.is_active = is_active
+            if password_hash is not None:
+                orm.password_hash = password_hash
+            await session.commit()
             await session.refresh(orm)
             return _orm_to_domain(orm)

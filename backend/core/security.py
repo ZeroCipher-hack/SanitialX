@@ -71,6 +71,7 @@ class TokenPayload(BaseModel):
     role: str
     exp: int
     jti: str
+    iat: int = 0  # issue time; tokens without it (older ones) count as issued at epoch 0
 
 
 def create_access_token(
@@ -87,6 +88,7 @@ def create_access_token(
         "sub": subject,
         "role": role,
         "exp": int(expire.timestamp()),
+        "iat": int(datetime.now(timezone.utc).timestamp()),
         "jti": str(uuid.uuid4()),
     }
     return jwt.encode(payload, secret_key, algorithm=algorithm)
