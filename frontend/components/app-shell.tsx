@@ -5,7 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import {
   Shield, Activity, AlertTriangle, FileText, Sliders, LogOut, Bell, X, Play, Cpu,
   Layers, Zap, Radio, Share2, Crosshair, Box, Brain, CheckCircle2, Loader2,
-  BookOpen, ScrollText, Bug, ChevronRight, LifeBuoy, Megaphone,
+  BookOpen, ScrollText, Bug, ChevronRight, LifeBuoy, Megaphone, KeyRound,
 } from 'lucide-react';
 import { useEffect, useState, useRef } from 'react';
 import { api, logout, runAttackSimulation } from '@/lib/api';
@@ -153,6 +153,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           {item('/guide', 'Qo‘llanma va test', <BookOpen size={17} />)}
           {item('/support', 'Yordam markazi', <LifeBuoy size={17} />)}
           {item('/news', 'Yangiliklar', <Megaphone size={17} />)}
+          {item('/license', 'Litsenziya', <KeyRound size={17} />)}
         </nav>
 
         <div className="sidebar-footer">

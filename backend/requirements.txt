@@ -23,6 +23,7 @@ httpx>=0.25,<1.0
 
 # Authentication
 PyJWT>=2.8,<3.0
+cryptography>=42.0
 
 # Google Gemini AI
 # API key is supplied only through SENTINELX_GEMINI_API_KEY.

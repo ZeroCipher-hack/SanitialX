@@ -56,6 +56,9 @@ class Settings(BaseSettings):
     agent_windows_minimum_version: str = Field(default="0.1.0")
     agent_windows_latest_version: str = Field(default="0.1.0")
 
+    license_file: str = Field(default="", description="Path to the signed license file")
+    license_public_key: str = Field(default="", description="Base64 Ed25519 public key used to verify licenses")
+
     gemini_api_key: str | None = Field(default=None, description="Google Gemini API key; keep server-side only")
     gemini_model: str = Field(default="gemini-3.6-flash", description="Gemini model used for incident analysis")
 

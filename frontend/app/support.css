@@ -15,3 +15,7 @@
 .sp-error{background:#32171b;border:1px solid #5a2230;color:#ff9aa5;border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:13px}
 .sp-empty{color:#587c98;text-align:center;padding:30px}
 @media(max-width:700px){.sp-row{grid-template-columns:1fr}}
+.lic-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}
+.lic-row{display:flex;flex-direction:column;gap:3px;padding:10px 12px;border:1px solid #10344a;border-radius:8px;background:#020912}.lic-row span{font-size:11px;color:#587c98}.lic-row b{font-size:14px;color:#d6ecf7}
+.lic-ok{background:#0f2f27;border:1px solid #17503f;color:#4be3ae;border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:13px}
+.sp-tag.lic-valid{background:#0f2f27;color:#4be3ae;border-color:#17503f}.sp-tag.lic-expired,.sp-tag.lic-invalid{background:#32171b;color:#ff8a96;border-color:#5a2230}.sp-tag.lic-missing,.sp-tag.lic-unconfigured{background:#2d2b1a;color:#e1d27b;border-color:#4b4524}

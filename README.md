@@ -226,3 +226,20 @@ SanitialX/
 ## License
 
 See the repository license for usage terms.
+
+## Licensing (offline)
+
+Licenses are Ed25519-signed JSON files verified locally, so air-gapped installs work.
+
+Vendor side (private key never ships):
+
+```bash
+python backend/scripts/license_tool.py keygen --out keys/
+python backend/scripts/license_tool.py sign --private-key keys/license_private.key \
+  --customer "Example Bank" --max-agents 200 --days 365 --out license.json
+```
+
+Customer side: set `SENTINELX_LICENSE_PUBLIC_KEY` (contents of `license_public.key`) and
+`SENTINELX_LICENSE_FILE` (path where the license is stored), then upload `license.json`
+on the **Litsenziya** page (admin) or `POST /api/v1/license`. Status: `GET /api/v1/license`.
+The license is currently informational: it is not yet enforced against agent enrollment.
