@@ -6,6 +6,7 @@ import './utility-rail.css';
 import './soc-theme.css';
 import './landing.css';
 import './sidebar-motion.css';
+import './support.css';
 import { AppShell } from '@/components/app-shell';
 
 export const metadata: Metadata = {

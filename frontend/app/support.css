@@ -1,0 +1,17 @@
+.sp-card{background:#061421;border:1px solid #10344a;border-radius:12px;padding:16px 18px;margin-bottom:12px}
+.sp-card h3{display:flex;align-items:center;gap:8px;margin:0 0 12px;font-size:14px;color:#dff9ff}
+.sp-card p{margin:8px 0;font-size:13px;line-height:1.55;color:#a9c4d3;white-space:pre-wrap}.sp-card small{color:#587c98;font-size:11px}
+.sp-form{display:grid;gap:10px}.sp-row{display:grid;grid-template-columns:auto 1fr 1fr;gap:10px}.sp-row select{grid-column:auto}
+.sp-card input,.sp-card select,.sp-card textarea{background:#020912;border:1px solid #123d57;border-radius:8px;color:#d6ecf7;padding:9px 11px;font:inherit;font-size:13px;min-width:0}
+.sp-card input:focus,.sp-card select:focus,.sp-card textarea:focus{outline:none;border-color:#12d8ff}
+.sp-btn{display:inline-flex;align-items:center;gap:7px;justify-self:start;background:linear-gradient(135deg,#12d8ff,#278cff);border:0;border-radius:8px;color:#021018;font-weight:600;font-size:13px;padding:9px 16px;cursor:pointer}
+.sp-btn:disabled{opacity:.45;cursor:not-allowed}.sp-btn.ghost{background:transparent;border:1px solid #1b4a66;color:#cfeaf6}
+.sp-head{display:flex;flex-wrap:wrap;align-items:center;gap:8px}.sp-head b{font-size:14px;margin-right:auto}
+.sp-tag{font-size:10px;letter-spacing:.6px;padding:3px 8px;border-radius:99px;background:#0b2f48;color:#8fd8ee;border:1px solid #123d57}
+.sp-tag.bug{background:#32171b;color:#ff8a96;border-color:#5a2230}.sp-tag.feature{background:#1d1b3a;color:#b9a6ff;border-color:#3a2f6e}
+.sp-tag.st-answered,.sp-tag.nw-release{background:#0f2f27;color:#4be3ae;border-color:#17503f}.sp-tag.st-closed{opacity:.6}.sp-tag.nw-rules{background:#2d2b1a;color:#e1d27b;border-color:#4b4524}
+.sp-reply{margin-top:10px;padding:10px 12px;border-left:3px solid #19e39a;background:#07241d;border-radius:0 8px 8px 0;font-size:13px;color:#bfeede}
+.sp-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}.sp-actions input{flex:1;min-width:180px}
+.sp-error{background:#32171b;border:1px solid #5a2230;color:#ff9aa5;border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:13px}
+.sp-empty{color:#587c98;text-align:center;padding:30px}
+@media(max-width:700px){.sp-row{grid-template-columns:1fr}}

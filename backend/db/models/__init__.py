@@ -13,6 +13,7 @@ from db.models.vulnerability import (
 )
 from db.models.vulnerability_alert import VulnerabilityAlertModel
 from db.models.soar import SoarActionModel, SoarAuditModel, AgentCommandModel
+from db.models.support import NewsItemModel, SupportTicketModel
 
 __all__ = [
     "UserORM",
@@ -30,4 +31,6 @@ __all__ = [
     "SoarActionModel",
     "SoarAuditModel",
     "AgentCommandModel",
+    "SupportTicketModel",
+    "NewsItemModel",
 ]
