@@ -21,10 +21,10 @@ const steps = [
 ];
 
 const stats = [
-  { to: 5, suffix: '+', label: 'Detection qoidalari' },
+  { to: 6, suffix: '', label: 'Detection qoidalari' },
   { to: 100, suffix: '%', label: 'Tasdiqlanadigan javob' },
   { to: 24, suffix: '/7', label: 'Doimiy monitoring' },
-  { to: 1, suffix: ' s', label: 'Aniqlash kechikishi' },
+  { to: 0, suffix: '', label: 'Vendorga avtomatik yuboriladigan ma’lumot' },
 ];
 
 export default function LandingPage() {

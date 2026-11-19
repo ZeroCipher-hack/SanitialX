@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="uz"><head><meta charset="utf-8"><title>SanitialX Reel</title>
+<style>
+*{box-sizing:border-box;margin:0}
+html,body{width:1080px;height:1920px;overflow:hidden;background:#020912;font-family:Inter,'Noto Sans','DejaVu Sans',Arial,sans-serif;color:#e6f6ff}
+#stage{position:relative;width:1080px;height:1920px;overflow:hidden;background:radial-gradient(circle at 70% 0,#0a3a5a 0,#020912 55%)}
+.grid{position:absolute;inset:-120px;background-image:linear-gradient(#12d8ff18 2px,transparent 2px),linear-gradient(90deg,#12d8ff18 2px,transparent 2px);background-size:90px 90px}
+.orb{position:absolute;width:900px;height:900px;border-radius:50%;filter:blur(160px);opacity:.32}
+.scene{position:absolute;inset:0;opacity:0}
+.abs{position:absolute;left:0;right:0;text-align:center}
+.big{font-size:128px;font-weight:900;letter-spacing:-3px;line-height:1.02}
+.mid{font-size:68px;font-weight:800;line-height:1.12;letter-spacing:-1px}
+.sub{font-size:44px;color:#8fb3c7;font-weight:500;line-height:1.3}
+.cy{color:#12d8ff}.rd{color:#ff405c}.gr{background:linear-gradient(90deg,#12d8ff,#8c65ff);-webkit-background-clip:text;background-clip:text;color:transparent}
+.chip{position:absolute;display:flex;align-items:center;gap:20px;padding:26px 34px;border:2px solid #1b4a66;border-radius:26px;background:#061421ee;font-size:44px;font-weight:700;white-space:nowrap;box-shadow:0 24px 60px #000a}
+.chip small{display:block;font-size:26px;letter-spacing:3px;color:#6fa0b8;font-weight:600;margin-top:4px}
+.dot{width:22px;height:22px;border-radius:50%}
+.row{position:absolute;left:90px;right:90px;display:flex;align-items:center;gap:40px;padding:44px 48px;border:2px solid #123d57;border-radius:36px;background:linear-gradient(160deg,#071a2b,#04101c)}
+.row b{font-size:96px;color:#12d8ff;font-weight:900;width:150px}.row h3{font-size:64px;font-weight:800}.row p{font-size:36px;color:#8fb3c7;margin-top:8px}
+.card{position:absolute;width:450px;height:430px;padding:44px;border:2px solid #123d57;border-radius:40px;background:linear-gradient(160deg,#071a2b,#04101c)}
+.card i{display:grid;place-items:center;width:100px;height:100px;border-radius:28px;background:#0b2f48;margin-bottom:34px}
+.card h3{font-size:50px;font-weight:800;line-height:1.1}.card p{font-size:32px;color:#8fb3c7;margin-top:14px}
+.btn{position:absolute;left:150px;right:150px;padding:44px;text-align:center;font-size:58px;font-weight:800;border-radius:34px;background:linear-gradient(135deg,#12d8ff,#278cff);color:#021018}
+svg{display:block}
+</style></head><body>
+<div id="stage">
+  <div class="grid" id="grid"></div>
+  <div class="orb" id="o1" style="background:#278cff;right:-300px;top:-200px"></div>
+  <div class="orb" id="o2" style="background:#8c65ff;left:-400px;bottom:-300px"></div>
+
+  <!-- S1 hook -->
+  <div class="scene" id="s1">
+    <div class="abs big rd" id="s1a" style="top:640px;font-size:210px">HUJUM</div>
+    <div class="abs big" id="s1b" style="top:900px">boshlandi.</div>
+    <div class="abs mid" id="s1c" style="top:1210px;color:#a9c4d3;font-weight:600">Siz buni <span class="cy">qachon</span> bilasiz?</div>
+  </div>
+
+  <!-- S2 radar -->
+  <div class="scene" id="s2">
+    <div class="abs mid" id="s2t" style="top:250px">Biz buni <span class="gr">real vaqtda</span><br>ko‘ramiz.</div>
+    <svg id="radar" width="900" height="900" viewBox="-450 -450 900 900" style="position:absolute;left:90px;top:620px">
+      <defs><radialGradient id="sw" cx="0" cy="0" r="1"><stop offset="0" stop-color="#12d8ff" stop-opacity=".0"/><stop offset="1" stop-color="#12d8ff" stop-opacity=".55"/></radialGradient></defs>
+      <circle r="440" fill="none" stroke="#12d8ff55" stroke-width="3"/><circle r="320" fill="none" stroke="#12d8ff44" stroke-width="3"/><circle r="200" fill="none" stroke="#12d8ff44" stroke-width="3"/><circle r="90" fill="#061421" stroke="#12d8ff88" stroke-width="3"/>
+      <line x1="-440" x2="440" stroke="#12d8ff22" stroke-width="2"/><line y1="-440" y2="440" stroke="#12d8ff22" stroke-width="2"/>
+      <g id="sweep"><path d="M0 0 L440 0 A440 440 0 0 0 380 -222 Z" fill="url(#sw)"/><line x2="440" stroke="#12d8ff" stroke-width="4"/></g>
+      <g id="blips"></g>
+      <path d="M-26 6 L-8 24 L28 -20" fill="none" stroke="#12d8ff" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    <div class="chip" id="c1" style="left:80px;top:690px"><span class="dot" style="background:#ff405c"></span><div>SSH brute-force<small>ANIQLANDI</small></div></div>
+    <div class="chip" id="c2" style="right:70px;top:1130px"><span class="dot" style="background:#ffd05a"></span><div>Port scan<small>TEKSHIRUVDA</small></div></div>
+    <div class="chip" id="c3" style="left:110px;top:1500px"><span class="dot" style="background:#19e39a"></span><div>SMB harakati<small>TASDIQ KUTILMOQDA</small></div></div>
+  </div>
+
+  <!-- S3 pipeline -->
+  <div class="scene" id="s3">
+    <div class="abs mid" id="s3t" style="top:250px">Aniqlaydi. Tahlil qiladi.<br><span class="gr">Javob beradi.</span></div>
+    <div class="row" id="r1" style="top:560px"><b>01</b><div><h3>Aniqlaydi</h3><p>Hujum qoidalari va MITRE ATT&amp;CK</p></div></div>
+    <div class="row" id="r2" style="top:910px"><b>02</b><div><h3>Tahlil qiladi</h3><p>AI hodisani tushuntirib beradi</p></div></div>
+    <div class="row" id="r3" style="top:1260px"><b>03</b><div><h3>Javob beradi</h3><p>Faqat sizning tasdig‘ingiz bilan</p></div></div>
+  </div>
+
+  <!-- S4 features -->
+  <div class="scene" id="s4">
+    <div class="abs mid" id="s4t" style="top:250px">Bitta platforma.<br><span class="gr">To‘liq SOC.</span></div>
+    <div class="card" id="k1" style="left:60px;top:640px"><i><svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="#12d8ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l8 4v6c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6z"/><path d="M9 12l2 2 4-4"/></svg></i><h3>Nazoratli SOAR</h3><p>Avval tasdiq, keyin amal</p></div>
+    <div class="card" id="k2" style="right:60px;top:640px"><i><svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="#8c65ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="6" width="16" height="12" rx="3"/><circle cx="9" cy="12" r="1.3"/><circle cx="15" cy="12" r="1.3"/><path d="M12 6V3"/></svg></i><h3>AI tahlil</h3><p>Hodisa tushunarli tilda</p></div>
+    <div class="card" id="k3" style="left:60px;top:1130px"><i><svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="#ffd05a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l9 16H3z"/><path d="M12 10v4M12 17v.5"/></svg></i><h3>Zaiflik ustuvorligi</h3><p>CVE, EPSS va KEV</p></div>
+    <div class="card" id="k4" style="right:60px;top:1130px"><i><svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="#19e39a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3h8l4 4v14H7z"/><path d="M15 3v4h4M10 12h6M10 16h6"/></svg></i><h3>Hisobotlar</h3><p>Bosmaga tayyor SOC hisobot</p></div>
+  </div>
+
+  <!-- S5 on-prem -->
+  <div class="scene" id="s5">
+    <svg width="520" height="520" viewBox="0 0 100 100" style="position:absolute;left:280px;top:260px">
+      <path id="lockbody" d="M24 44h52v40H24z" fill="#061421" stroke="#12d8ff" stroke-width="2.4" stroke-linejoin="round" pathLength="1" stroke-dasharray="1" stroke-dashoffset="1"/>
+      <path id="lockarc" d="M34 44V32a16 16 0 0 1 32 0v12" fill="none" stroke="#12d8ff" stroke-width="2.4" stroke-linecap="round" pathLength="1" stroke-dasharray="1" stroke-dashoffset="1"/>
+      <circle id="lockdot" cx="50" cy="62" r="4.5" fill="#12d8ff"/>
+    </svg>
+    <div class="abs big" id="s5a" style="top:900px;font-size:100px">Ma’lumotlaringiz<br><span class="gr">o‘z serveringizda.</span></div>
+    <div class="abs sub" id="s5b" style="top:1290px">Internetsiz ham ishlaydi.<br>Imzolangan offline litsenziya.</div>
+    <div class="abs sub" id="s5c" style="top:1560px;color:#12d8ff;letter-spacing:6px;font-weight:700">BANKLAR UCHUN QURILGAN</div>
+  </div>
+
+  <!-- S6 CTA -->
+  <div class="scene" id="s6">
+    <div id="logo" style="position:absolute;left:440px;top:400px;width:200px;height:200px;border-radius:56px;background:linear-gradient(145deg,#0b3350,#0b6b8d);border:3px solid #1fcfff88;box-shadow:0 0 120px #13d8ff66;display:grid;place-items:center">
+      <svg width="110" height="110" viewBox="0 0 24 24" fill="none" stroke="#12d8ff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l8 4v6c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6z"/><path d="M8 12h2l1.5-3 2 6 1.5-3h1"/></svg>
+    </div>
+    <div class="abs big" id="s6a" style="top:700px;font-size:140px;letter-spacing:6px">SANITIAL<span class="cy">X</span></div>
+    <div class="abs mid" id="s6b" style="top:900px;color:#a9c4d3;font-weight:600">Bankingiz xavfsizligini<br>nazoratga oling.</div>
+    <div class="btn" id="s6c" style="top:1280px">Demo uchun DM yozing</div>
+  </div>
+</div>
+<script>
+const clamp=(x,a=0,b=1)=>Math.min(b,Math.max(a,x));
+const seg=(t,a,b)=>clamp((t-a)/(b-a));
+const oc=x=>1-Math.pow(1-x,3), oq=x=>1-Math.pow(1-x,5), io=x=>x<.5?4*x*x*x:1-Math.pow(-2*x+2,3)/2;
+const back=x=>{const c=1.70158;return 1+(c+1)*Math.pow(x-1,3)+c*Math.pow(x-1,2)};
+const $=id=>document.getElementById(id);
+const DUR=27;
+const scenes=[['s1',0,3.4],['s2',3.2,8.4],['s3',8.2,13.4],['s4',13.2,18.4],['s5',18.2,23.0],['s6',22.8,27]];
+const blips=[[200,-150,'#ff405c'],[-230,120,'#ffd05a'],[120,270,'#19e39a'],[-90,-300,'#ff405c']];
+$('blips').innerHTML=blips.map((b,i)=>`<circle id="b${i}" cx="${b[0]}" cy="${b[1]}" r="14" fill="${b[2]}"/><circle id="bw${i}" cx="${b[0]}" cy="${b[1]}" r="14" fill="none" stroke="${b[2]}" stroke-width="4"/>`).join('');
+const set=(el,o)=>{for(const k in o)el.style[k]=o[k]};
+function pop(el,p,from='translateY(60px)'){set(el,{opacity:clamp(p*2),transform:p<1?`${from} scale(${.92+.08*oc(p)})`:'none'})}
+
+window.render=function(t){
+  // background motion
+  $('grid').style.transform=`translateY(${(t*40)%90}px)`;
+  set($('o1'),{transform:`translate(${Math.sin(t*.5)*80}px,${Math.cos(t*.4)*60}px)`});
+  set($('o2'),{transform:`translate(${Math.cos(t*.45)*90}px,${Math.sin(t*.5)*70}px)`});
+  // scene visibility with crossfade
+  for(const [id,a,b] of scenes){const op=Math.min(seg(t,a,a+.4),1-seg(t,b-.4,b));$(id).style.opacity=op;$(id).style.display=op>0?'block':'none'}
+
+  // S1 hook
+  {const a=seg(t,.15,.6),g=t>.15&&t<1.1?Math.sin(t*90)*14:0;
+   set($('s1a'),{opacity:a,transform:`translateX(${g}px) scale(${1.25-.25*oq(a)})`,textShadow:t<1.1?`${-g}px 0 #12d8ff,${g}px 0 #ff405c`:'0 0 60px #ff405c88'});
+   pop($('s1b'),oc(seg(t,1.0,1.5)));pop($('s1c'),oc(seg(t,1.9,2.5)))}
+
+  // S2 radar
+  {const l=t-3.2;set($('radar'),{opacity:seg(l,0,.5),transform:`scale(${.85+.15*oq(seg(l,0,.9))})`});
+   $('sweep').setAttribute('transform',`rotate(${(l*160)%360})`);
+   pop($('s2t'),oc(seg(l,0,.6)),'translateY(-40px)');
+   const ts=[1.0,2.0,3.0];['c1','c2','c3'].forEach((id,i)=>{const p=seg(l,ts[i],ts[i]+.55);set($(id),{opacity:clamp(p*3),transform:`translateY(${(1-back(p))*-80}px) scale(${.8+.2*back(p)})`})});
+   blips.forEach((b,i)=>{const p=seg(l,.7+i*.8,1.2+i*.8);$('b'+i).setAttribute('r',14*oq(p));$('b'+i).style.opacity=p>0?1:0;
+     const w=((l-(.7+i*.8))%1.6)/1.6;$('bw'+i).setAttribute('r',14+90*w);$('bw'+i).style.opacity=p>0?(1-w)*.9:0})}
+
+  // S3 pipeline
+  {const l=t-8.2;pop($('s3t'),oc(seg(l,0,.6)),'translateY(-40px)');
+   [['r1',.7],['r2',1.7],['r3',2.7]].forEach(([id,s])=>{const p=oq(seg(l,s,s+.7));set($(id),{opacity:clamp(p*2),transform:`translateX(${(1-p)*-700}px)`,borderColor:l>s+.7&&l<s+1.6?'#12d8ff':'#123d57',boxShadow:l>s+.7&&l<s+1.6?'0 0 80px #12d8ff44':'none'})})}
+
+  // S4 features
+  {const l=t-13.2;pop($('s4t'),oc(seg(l,0,.6)),'translateY(-40px)');
+   ['k1','k2','k3','k4'].forEach((id,i)=>{const p=back(seg(l,.6+i*.55,1.3+i*.55));set($(id),{opacity:clamp(p*3),transform:`translateY(${(1-p)*140}px) rotate(${(1-p)*(i%2?4:-4)}deg) scale(${.8+.2*p})`})})}
+
+  // S5 on-prem
+  {const l=t-18.2;const lb=seg(l,.1,1.0),la=seg(l,.7,1.5);
+   $('lockbody').setAttribute('stroke-dashoffset',1-io(lb));$('lockarc').setAttribute('stroke-dashoffset',1-io(la));
+   set($('lockdot'),{opacity:seg(l,1.3,1.6),transformOrigin:'50px 62px',transform:`scale(${1+.25*Math.sin(l*5)})`});
+   pop($('s5a'),oc(seg(l,1.2,1.9)));pop($('s5b'),oc(seg(l,2.0,2.6)));pop($('s5c'),oc(seg(l,2.8,3.4)))}
+
+  // S6 CTA
+  {const l=t-22.8;const p=back(seg(l,0,.7));set($('logo'),{opacity:clamp(p*3),transform:`scale(${p}) rotate(${(1-p)*-25}deg)`});
+   const a=oc(seg(l,.5,1.2));set($('s6a'),{opacity:a,letterSpacing:`${6+(1-a)*30}px`});
+   pop($('s6b'),oc(seg(l,1.2,1.9)));
+   const bp=back(seg(l,1.9,2.5));set($('s6c'),{opacity:clamp(bp*3),transform:`scale(${.85+.15*bp+ (l>2.6?.03*Math.sin(l*6):0)})`,boxShadow:`0 0 ${50+40*Math.abs(Math.sin(l*3))}px #12d8ff88`})}
+};
+window.DURATION=DUR;window.render(0);
+</script></body></html>
