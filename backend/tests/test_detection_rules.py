@@ -8,6 +8,7 @@ import pytest
 from correlation.enums import Severity
 from correlation.rules.honeypot import HoneypotDetectionRule
 from correlation.rules.port_scan import PortScanDetectionRule
+from correlation.rules.database_bruteforce import DatabaseBruteForceDetectionRule
 from correlation.rules.rdp_bruteforce import RDPBruteForceDetectionRule
 from correlation.rules.smb_lateral import SMBLateralMovementDetectionRule
 from correlation.rules.ssh_bruteforce import SSHBruteForceDetectionRule
@@ -149,6 +150,27 @@ class TestSMBLateralMovementDetectionRule:
 
         for _ in range(3):
             assert rule.evaluate(_make_event(src="5.5.5.5", dport=80), store) == []
+
+
+class TestDatabaseBruteForceDetectionRule:
+    def test_triggers_across_database_ports(self) -> None:
+        rule = DatabaseBruteForceDetectionRule(attempt_threshold=3, window_seconds=60)
+        store = InMemoryCorrelationStateStore()
+
+        assert rule.evaluate(_make_event(src="6.6.6.6", dport=1433), store) == []
+        assert rule.evaluate(_make_event(src="6.6.6.6", dport=3306), store) == []
+
+        detections = rule.evaluate(_make_event(src="6.6.6.6", dport=5432), store)
+        assert len(detections) == 1
+        assert detections[0].source_ip == "6.6.6.6"
+        assert detections[0].context["attempts_count"] == 3
+
+    def test_ignores_non_database_ports(self) -> None:
+        rule = DatabaseBruteForceDetectionRule(attempt_threshold=2, window_seconds=60)
+        store = InMemoryCorrelationStateStore()
+
+        for _ in range(3):
+            assert rule.evaluate(_make_event(src="6.6.6.6", dport=80), store) == []
 
 
 class TestHoneypotDetectionRule:
