@@ -130,6 +130,24 @@ class ApplicationContainer:
                 post_event_hook=self.live_vulnerability_hook,
             )
 
+    async def seed_builtin_rules(self) -> int:
+        """Persist the built-in rules so they are listed and can be toggled. Never overwrites existing rows."""
+        seeded = 0
+        for rule in self.correlation_engine.rules:
+            if await self.rule_repository.get_rule(rule.rule_id) is not None:
+                continue
+            severity = getattr(rule, "_severity", None)
+            await self.rule_repository.save_rule(
+                rule_id=rule.rule_id,
+                rule_name=rule.rule_name,
+                severity=getattr(severity, "value", None) or str(severity or "MEDIUM"),
+                description=getattr(rule, "_description", None) or "Built-in detection rule.",
+                enabled=True,
+                parameters={},
+            )
+            seeded += 1
+        return seeded
+
     async def refresh_detection_rules(self) -> dict[str, int]:
         rules = await self.rule_repository.list_rules(limit=1000, offset=0)
         return self.rule_runtime_manager.apply_rules(rules)

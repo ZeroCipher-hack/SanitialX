@@ -55,7 +55,7 @@ export default function LoginPage() {
             <b>
               SANITIAL<span>X</span>
             </b>
-            <small>BY TOLQIN AKRAMOV</small>
+            <small>SECURITY PLATFORM</small>
           </div>
         </div>
 

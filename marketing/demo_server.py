@@ -33,13 +33,38 @@ settings = Settings(
 )
 
 
+CREDENTIALS_FILE = Path(tempfile.gettempdir()) / "sanitialx-demo-credentials.txt"
+
+
+async def _create_demo_users(db: DatabaseSessionManager) -> None:
+    """Create an admin and an analyst with random passwords; written to a 0600 file, never printed."""
+    import secrets, uuid
+    from datetime import datetime, timezone
+    from auth.models import User
+    from core.security import hash_password
+    from db.repositories.user_repository import PostgresUserRepository
+
+    repo = PostgresUserRepository(db.sessionmaker)
+    lines = []
+    for username, role in (("admin", "admin"), ("analyst", "analyst")):
+        password = secrets.token_urlsafe(12)
+        await repo.create(User(user_id=str(uuid.uuid4()), username=username, password_hash=hash_password(password),
+                               role=role, is_active=True, created_at=datetime.now(timezone.utc)))
+        lines.append(f"{username} ({role}): {password}")
+    fd = os.open(CREDENTIALS_FILE, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w") as fh:
+        fh.write("\n".join(lines) + "\n")
+
+
 async def lifespan(app: FastAPI):
     db = DatabaseSessionManager(settings.DATABASE_URL)
     db.init()
     async with db._engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+    await _create_demo_users(db)
     container = ApplicationContainer(settings=settings, db_manager=db)
     container.redis_client = fakeredis.aioredis.FakeRedis(decode_responses=True)
+    await container.seed_builtin_rules()
     app.state.container = container
     app.state.is_ready = True
     yield

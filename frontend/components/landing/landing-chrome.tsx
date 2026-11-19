@@ -21,7 +21,7 @@ export function LandingNav() {
 export function LandingFooter() {
   return (
     <footer className="lp-footer">
-      <span>© {new Date().getFullYear()} SanitialX by Tolqin Akramov. Barcha huquqlar himoyalangan.</span>
+      <span>© {new Date().getFullYear()} SanitialX. Barcha huquqlar himoyalangan.</span>
       <span><Link href="/login">Kirish</Link> · <Link href="/pricing">Narxlar</Link></span>
     </footer>
   );

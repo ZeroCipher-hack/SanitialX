@@ -62,6 +62,13 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         logger.warning("Database schema create_tables note: %s", exc)
 
     try:
+        seeded = await container.seed_builtin_rules()
+        if seeded:
+            logger.info("Seeded %s built-in detection rules.", seeded)
+    except Exception as exc:
+        logger.error("Failed to seed built-in detection rules: %s", exc)
+
+    try:
         result = await container.refresh_detection_rules()
         logger.info("Applied persisted detection rules: %s applied, %s skipped.", result["applied"], result["skipped"])
     except Exception as exc:

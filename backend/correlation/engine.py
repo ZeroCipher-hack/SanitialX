@@ -50,6 +50,11 @@ class CorrelationEngine:
     def register_rule(self, rule: DetectionRule) -> None:
         self._rules.append(rule)
 
+    @property
+    def rules(self) -> tuple[DetectionRule, ...]:
+        """Read-only snapshot of the registered rules."""
+        return tuple(self._rules)
+
     def upsert_rule(self, rule: DetectionRule) -> None:
         self._rules = [item for item in self._rules if item.rule_id != rule.rule_id]
         self._rules.append(rule)

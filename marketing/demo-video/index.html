@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="uz"><head><meta charset="utf-8"><title>SanitialX Demo</title>
+<style>
+*{box-sizing:border-box;margin:0}
+html,body{width:1080px;height:1920px;overflow:hidden;background:#020912;font-family:Inter,'Noto Sans','DejaVu Sans',Arial,sans-serif;color:#e6f6ff}
+#stage{position:relative;width:1080px;height:1920px;overflow:hidden;background:radial-gradient(circle at 70% 0,#0a3a5a 0,#020912 55%)}
+.grid{position:absolute;inset:-120px;background-image:linear-gradient(#12d8ff14 2px,transparent 2px),linear-gradient(90deg,#12d8ff14 2px,transparent 2px);background-size:90px 90px}
+.orb{position:absolute;width:900px;height:900px;border-radius:50%;filter:blur(160px);opacity:.3}
+.abs{position:absolute;left:0;right:0;text-align:center}
+.cy{color:#12d8ff}.gr{background:linear-gradient(90deg,#12d8ff,#8c65ff);-webkit-background-clip:text;background-clip:text;color:transparent}
+.big{font-size:120px;font-weight:900;letter-spacing:-3px;line-height:1.02}
+.mid{font-size:64px;font-weight:800;line-height:1.12;letter-spacing:-1px}
+.sub{font-size:40px;color:#8fb3c7;font-weight:500;line-height:1.3}
+.scene{position:absolute;inset:0;opacity:0}
+/* device */
+#device{position:absolute;left:60px;top:560px;width:960px;height:960px;border-radius:36px;border:2px solid #1b4a66;background:#04101c;box-shadow:0 40px 120px #000c,0 0 120px #12d8ff22;overflow:hidden}
+#bar{height:56px;display:flex;align-items:center;gap:12px;padding:0 24px;background:#061421;border-bottom:2px solid #10344a}
+#bar i{width:16px;height:16px;border-radius:50%;background:#ff405c}#bar i:nth-child(2){background:#ffd05a}#bar i:nth-child(3){background:#19e39a}
+#bar span{margin-left:18px;font-size:22px;color:#587c98;letter-spacing:1px}
+#view{position:absolute;left:0;top:56px;width:960px;height:904px;overflow:hidden}
+.cam{position:absolute;left:0;top:0;width:1440px;height:900px;transform-origin:0 0;opacity:0}
+.cam img{position:absolute;left:0;top:0;width:1440px;height:900px}
+.box{position:absolute;border:3px solid #12d8ff;border-radius:12px;box-shadow:0 0 0 9999px transparent,0 0 30px #12d8ffaa;opacity:0;pointer-events:none}
+#step{position:absolute;left:60px;top:230px;font-size:34px;letter-spacing:6px;color:#12d8ff;font-weight:700}
+#cap{position:absolute;left:60px;right:60px;top:290px;font-size:68px;font-weight:900;letter-spacing:-1.5px;line-height:1.08}
+#csub{position:absolute;left:60px;right:60px;top:1570px;font-size:42px;color:#a9c4d3;font-weight:500;line-height:1.3}
+#dots{position:absolute;left:0;right:0;top:1760px;display:flex;justify-content:center;gap:16px}
+#dots i{width:14px;height:14px;border-radius:50%;background:#123d57}
+.btn{position:absolute;left:150px;right:150px;padding:44px;text-align:center;font-size:58px;font-weight:800;border-radius:34px;background:linear-gradient(135deg,#12d8ff,#278cff);color:#021018}
+</style></head><body>
+<div id="stage">
+  <div class="grid" id="grid"></div>
+  <div class="orb" id="o1" style="background:#278cff;right:-300px;top:-200px"></div>
+  <div class="orb" id="o2" style="background:#8c65ff;left:-400px;bottom:-300px"></div>
+
+  <div class="scene" id="intro">
+    <div id="ilogo" style="position:absolute;left:440px;top:420px;width:200px;height:200px;border-radius:56px;background:linear-gradient(145deg,#0b3350,#0b6b8d);border:3px solid #1fcfff88;box-shadow:0 0 120px #13d8ff66;display:grid;place-items:center">
+      <svg width="130" height="130" viewBox="0 0 64 64" fill="none"><defs><linearGradient id="nb" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#12d8ff"/><stop offset="1" stop-color="#278cff"/></linearGradient></defs><path d="M32 4 54 12v18c0 14-10 24-22 30C20 54 10 44 10 30V12z" fill="#061421" stroke="url(#nb)" stroke-width="2.6" stroke-linejoin="round"/><circle cx="32" cy="32" r="6" stroke="#12d8ff" stroke-width="2"/><circle cx="32" cy="32" r="12" stroke="#12d8ff" stroke-opacity=".53" stroke-width="2"/><circle cx="32" cy="32" r="18" stroke="#12d8ff" stroke-opacity=".27" stroke-width="2"/><path d="M32 32 47 20A18 18 0 0 1 50 32Z" fill="#12d8ff" fill-opacity=".33"/><path d="M32 32 47 20" stroke="#12d8ff" stroke-width="3" stroke-linecap="round"/><circle cx="41" cy="40" r="2.6" fill="#ff405c"/></svg>
+    </div>
+    <div class="abs big" id="it1" style="top:720px;font-size:130px;letter-spacing:6px">SANITIAL<span class="cy">X</span></div>
+    <div class="abs mid" id="it2" style="top:940px;color:#a9c4d3;font-weight:600">Ichkaridan ko‘ring.</div>
+    <div class="abs sub" id="it3" style="top:1130px;letter-spacing:5px;color:#12d8ff;font-weight:700">HAQIQIY MAHSULOT EKRANLARI</div>
+  </div>
+
+  <div id="main" style="opacity:0">
+    <div id="step"></div><div id="cap"></div>
+    <div id="device"><div id="bar"><i></i><i></i><i></i><span>SANITIALX · SOC</span></div>
+      <div id="view">
+        <div class="cam" id="c1"><img src="shots/dashboard.png"><div class="box" id="c1a" style="left:275px;top:160px;width:1085px;height:118px"></div><div class="box" id="c1b" style="left:1053px;top:442px;width:310px;height:293px"></div></div>
+        <div class="cam" id="c2"><img src="shots/incidents.png"><div class="box" id="c2a" style="left:277px;top:277px;width:1080px;height:52px"></div><div class="box" id="c2b" style="left:277px;top:329px;width:1080px;height:104px"></div></div>
+        <div class="cam" id="c3"><img src="shots/graph.png"><div class="box" id="c3a" style="left:297px;top:250px;width:672px;height:440px"></div><div class="box" id="c3b" style="left:1005px;top:160px;width:352px;height:553px"></div></div>
+        <div class="cam" id="c4"><img src="shots/incident.png"><div class="box" id="c4a" style="left:407px;top:447px;width:626px;height:52px"></div><div class="box" id="c4b" style="left:407px;top:766px;width:626px;height:80px"></div></div>
+        <div class="cam" id="c5"><img src="shots/agents.png"><div class="box" id="c5a" style="left:1060px;top:372px;width:215px;height:405px"></div></div>
+        <div class="cam" id="c6"><img src="shots/simulations.png"><div class="box" id="c6a" style="left:297px;top:212px;width:1040px;height:243px"></div><div class="box" id="c6b" style="left:277px;top:603px;width:1080px;height:166px"></div></div>
+      </div>
+    </div>
+    <div id="csub"></div><div id="dots"></div>
+  </div>
+
+  <div class="scene" id="cta">
+    <div class="abs big" id="ct1" style="top:560px;font-size:96px">Bankingiz<br><span class="gr">xavfsizligini</span><br>nazoratga oling.</div>
+    <div class="abs sub" id="ct2" style="top:1060px">Ma’lumotlar o‘z serveringizda.<br>Internetsiz ham ishlaydi.</div>
+    <div class="btn" id="ct3" style="top:1380px">Demo uchun DM yozing</div>
+  </div>
+</div>
+<script>
+const clamp=(x,a=0,b=1)=>Math.min(b,Math.max(a,x));
+const seg=(t,a,b)=>clamp((t-a)/(b-a));
+const oc=x=>1-Math.pow(1-x,3), oq=x=>1-Math.pow(1-x,5), io=x=>x<.5?4*x*x*x:1-Math.pow(-2*x+2,3)/2;
+const back=x=>{const c=1.70158;return 1+(c+1)*Math.pow(x-1,3)+c*Math.pow(x-1,2)};
+const $=id=>document.getElementById(id);
+const set=(el,o)=>{for(const k in o)el.style[k]=o[k]};
+const pop=(el,p,from='translateY(50px)')=>set(el,{opacity:clamp(p*2),transform:p<1?`${from}`.replace(/\(([-\d.]+)px\)/,(m,v)=>`(${v*(1-oc(p))}px)`):'none'});
+const DUR=39;
+const intro=[0,2.8], main0=2.5, cta=[34.5,39];
+// view 960x904; camera = [scale, cx, cy] in image coords
+const S=[
+ {id:'c1',a:main0,   b:8.5,  n:'01',cap:'Hamma narsa <span class="gr">bitta panelda</span>',sub:'Xavfsizlik holati, hodisalar, agentlar va tahdid xaritasi real vaqtda.',
+  from:[1.0,480,430],to:[1.0,960,470],boxes:[['c1a',1.2],['c1b',3.4]]},
+ {id:'c2',a:8.3, b:13.5, n:'02',cap:'Hodisalar <span class="gr">ustuvorlik bilan</span>',sub:'Kritik va yuqori xavfli hodisalar darhol ajratib ko‘rsatiladi.',
+  from:[1.2,760,300],to:[1.25,780,330],boxes:[['c2a',1.0],['c2b',2.4]]},
+ {id:'c3',a:13.3,b:19.0, n:'03',cap:'Hujum yo‘li <span class="gr">MITRE bilan</span>',sub:'Hujum bosqichlari T1548 → T1005 → T1041 zanjirida ko‘rinadi.',
+  from:[1.0,560,440],to:[1.0,820,430],boxes:[['c3a',1.0],['c3b',3.2]]},
+ {id:'c4',a:18.8,b:24.8, n:'04',cap:'Dalil va <span class="gr">nazoratli javob</span>',sub:'Javob amali faqat tasdiqdan keyin bajariladi. Hech narsa nazoratsiz emas.',
+  from:[1.35,720,330],to:[1.35,720,560],boxes:[['c4a',1.0],['c4b',3.6]]},
+ {id:'c5',a:24.6,b:29.5, n:'05',cap:'Endpoint <span class="gr">agentlar</span>',sub:'Har bir aktivning holati va xavf bahosi bitta ro‘yxatda.',
+  from:[1.1,640,420],to:[1.15,900,500],boxes:[['c5a',1.4]]},
+ {id:'c6',a:29.3,b:34.8, n:'06',cap:'Hujumni <span class="gr">xavfsiz sinang</span>',sub:'Kiber poligon: aniqlash qoidalarini nazorat ostida tekshiring.',
+  from:[1.05,760,300],to:[1.1,780,560],boxes:[['c6a',1.0],['c6b',3.0]]},
+];
+$('dots').innerHTML=S.map(()=>'<i></i>').join('');
+const lerp=(a,b,t)=>a+(b-a)*t;
+
+window.render=function(t){
+  $('grid').style.transform=`translateY(${(t*40)%90}px)`;
+  set($('o1'),{transform:`translate(${Math.sin(t*.5)*80}px,${Math.cos(t*.4)*60}px)`});
+  set($('o2'),{transform:`translate(${Math.cos(t*.45)*90}px,${Math.sin(t*.5)*70}px)`});
+
+  // intro
+  {const op=Math.min(seg(t,0,.3),1-seg(t,intro[1]-.4,intro[1]));$('intro').style.opacity=op;$('intro').style.display=op>0?'block':'none';
+   const p=back(seg(t,0,.7));set($('ilogo'),{opacity:clamp(p*3),transform:`scale(${p}) rotate(${(1-p)*-25}deg)`});
+   const a=oc(seg(t,.4,1.1));set($('it1'),{opacity:a,letterSpacing:`${6+(1-a)*30}px`});
+   pop($('it2'),oc(seg(t,1.0,1.7)));pop($('it3'),oc(seg(t,1.6,2.2)))}
+
+  // main
+  const mop=Math.min(seg(t,main0,main0+.5),1-seg(t,cta[0]-.2,cta[0]+.3));
+  $('main').style.opacity=mop;$('main').style.display=mop>0?'block':'none';
+  S.forEach((s,i)=>{
+    const op=Math.min(seg(t,s.a,s.a+.45),1-seg(t,s.b-.45,s.b));
+    const cam=$(s.id);cam.style.opacity=op;cam.style.display=op>0?'block':'none';
+    if(op<=0)return;
+    const k=io(seg(t,s.a,s.b));const sc=lerp(s.from[0],s.to[0],k),cx=lerp(s.from[1],s.to[1],k),cy=lerp(s.from[2],s.to[2],k);
+    cam.style.transform=`translate(${480-cx*sc}px,${452-cy*sc}px) scale(${sc})`;
+    s.boxes.forEach(([id,at])=>{const l=t-s.a-at;const p=oq(seg(l,0,.5));const pulse=l>.5?(.55+.45*Math.abs(Math.sin(l*3))):1;
+      const el=$(id);el.style.opacity=op*clamp(p)*(l>2.2?clamp(1-seg(l,2.2,2.8))*.9+.0:1)*pulse;el.style.transform=`scale(${1.06-.06*p})`});
+    if(t>=s.a&&t<s.b){
+      const l=t-s.a;
+      $('step').textContent=`${s.n} / 06`;$('cap').innerHTML=s.cap;$('csub').innerHTML=s.sub;
+      const o=Math.min(seg(l,0,.5),1-seg(t,s.b-.4,s.b));
+      set($('step'),{opacity:o});set($('cap'),{opacity:o,transform:`translateX(${(1-oc(seg(l,0,.6)))*-60}px)`});set($('csub'),{opacity:Math.min(seg(l,.3,.9),1-seg(t,s.b-.4,s.b)),transform:`translateY(${(1-oc(seg(l,.3,.9)))*30}px)`});
+      [...$('dots').children].forEach((d,j)=>{d.style.background=j===i?'#12d8ff':'#123d57';d.style.width=j===i?'44px':'14px';d.style.borderRadius='8px'});
+    }
+  });
+  set($('device'),{transform:`translateY(${(1-oc(seg(t,main0,main0+.8)))*120}px)`});
+
+  // cta
+  {const op=seg(t,cta[0],cta[0]+.5);$('cta').style.opacity=op;$('cta').style.display=op>0?'block':'none';const l=t-cta[0];
+   pop($('ct1'),oc(seg(l,.1,.8)));pop($('ct2'),oc(seg(l,.8,1.5)));
+   const bp=back(seg(l,1.5,2.1));set($('ct3'),{opacity:clamp(bp*3),transform:`scale(${.85+.15*bp+(l>2.2?.03*Math.sin(l*6):0)})`,boxShadow:`0 0 ${50+40*Math.abs(Math.sin(l*3))}px #12d8ff88`})}
+};
+window.DURATION=DUR;window.render(0);
+</script></body></html>
