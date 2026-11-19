@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from api.deps import get_current_user, get_db_session, require_role
 from core.agent_versions import evaluate_agent_version
 from core.config import get_settings
+from core.license import enrollment_block_reason, load_license
 from core.security import TokenPayload, generate_agent_token, hash_agent_token, verify_agent_token
 from db.repositories.agent_repository import PostgresAgentRepository
 from db.repositories.soar_repository import PostgresSoarRepository
@@ -121,7 +122,11 @@ def _software_to_dict(item:Any)->dict[str,Any]:
 async def enroll_agent(payload:AgentEnrollmentPayload,session:Annotated[AsyncSession,Depends(get_db_session)],enrollment_key:Annotated[str|None,Header(alias="X-Enrollment-Key")]=None)->dict[str,Any]:
     settings=get_settings()
     if not enrollment_key or not hmac.compare_digest(enrollment_key,settings.api_key):raise HTTPException(status_code=401,detail="Invalid enrollment key.")
-    raw_token=generate_agent_token();model=await PostgresAgentRepository(session).enroll_agent(payload.model_dump(),hash_agent_token(raw_token))
+    repo=PostgresAgentRepository(session)
+    if await repo.get_agent_model(payload.agent_id) is None:
+        block=enrollment_block_reason(load_license(settings.license_file,settings.license_public_key),await repo.count_licensed_agents())
+        if block:raise HTTPException(status_code=402,detail=block)
+    raw_token=generate_agent_token();model=await repo.enroll_agent(payload.model_dump(),hash_agent_token(raw_token))
     return {"agent_id":model.agent_id,"agent_token":raw_token,"status":model.status,"enrolled_at":model.enrolled_at.isoformat() if model.enrolled_at else None,"heartbeat_interval_seconds":settings.agent_heartbeat_interval_seconds,"version_policy":_version_policy(model)}
 
 @router.post("/{agent_id}/heartbeat")

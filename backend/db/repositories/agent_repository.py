@@ -30,6 +30,14 @@ class PostgresAgentRepository:
             self._session.add(model)
         await self._session.commit(); await self._session.refresh(model); return model
 
+    async def count_licensed_agents(self) -> int:
+        """Enrolled endpoint agents that occupy a license seat (retired assets do not)."""
+        return int(await self._session.scalar(
+            select(func.count()).select_from(AgentModel).where(
+                AgentModel.source == "agent", AgentModel.lifecycle_status != "RETIRED"
+            )
+        ) or 0)
+
     async def enroll_agent(self, agent_data: dict[str, Any], token_hash: str) -> AgentModel:
         now = datetime.now(timezone.utc); agent_id = agent_data["agent_id"]
         model = await self._session.get(AgentModel, agent_id)

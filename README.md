@@ -242,4 +242,7 @@ python backend/scripts/license_tool.py sign --private-key keys/license_private.k
 Customer side: set `SENTINELX_LICENSE_PUBLIC_KEY` (contents of `license_public.key`) and
 `SENTINELX_LICENSE_FILE` (path where the license is stored), then upload `license.json`
 on the **Litsenziya** page (admin) or `POST /api/v1/license`. Status: `GET /api/v1/license`.
-The license is currently informational: it is not yet enforced against agent enrollment.
+Enforcement (only when `SENTINELX_LICENSE_PUBLIC_KEY` is set): enrolling a **new** agent returns
+HTTP 402 if the license is missing, invalid or expired, or if `max_agents` is reached. Agents that are
+already enrolled keep working and may re-enroll; retired assets do not use a seat. Without a public key
+(development) nothing is restricted.

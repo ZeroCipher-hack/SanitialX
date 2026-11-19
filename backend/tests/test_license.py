@@ -120,3 +120,43 @@ async def test_license_api_install_and_status(client, tmp_path: Path) -> None:  
     assert ok.status_code == 200 and ok.json()["state"] == "VALID"
     shown = await client.get("/api/v1/license", headers=_headers("analyst"))
     assert shown.json()["customer"] == "Bank" and shown.json()["max_agents"] == 5
+
+
+# --- enrollment enforcement ---------------------------------------------
+
+from core.license import LicenseStatus, enrollment_block_reason  # noqa: E402
+
+
+def test_enrollment_block_reason_rules() -> None:
+    valid = LicenseStatus("VALID", max_agents=2)
+    assert enrollment_block_reason(LicenseStatus("UNCONFIGURED"), 999) is None
+    assert enrollment_block_reason(valid, 1) is None
+    assert "limit" in enrollment_block_reason(valid, 2)
+    assert "expired" in enrollment_block_reason(LicenseStatus("EXPIRED", "License has expired."), 0)
+    assert enrollment_block_reason(LicenseStatus("MISSING", "No license file installed."), 0)
+
+
+@pytest.mark.asyncio
+async def test_enroll_enforces_agent_limit(client, tmp_path: Path, monkeypatch) -> None:  # noqa: F811
+    key = Ed25519PrivateKey.generate()
+    settings = app.state.container.settings
+    now = datetime.now(timezone.utc)
+    payload = {"customer": "Bank", "plan": "pro", "max_agents": 1, "features": [],
+               "issued_at": now.isoformat(), "expires_at": (now + timedelta(days=30)).isoformat()}
+    lic = tmp_path / "license.json"
+    lic.write_text(json.dumps({"payload": payload, "signature": base64.b64encode(key.sign(canonical_bytes(payload))).decode()}))
+    settings.license_public_key = _pub(key)
+    settings.license_file = str(lic)
+    monkeypatch.setattr("api.agents.get_settings", lambda: settings)
+
+    def enroll(agent_id: str):
+        return client.post(
+            "/api/v1/agents/enroll",
+            json={"agent_id": agent_id, "hostname": "h", "ip_address": "10.0.0.1", "os": "linux"},
+            headers={"X-Enrollment-Key": settings.api_key},
+        )
+
+    assert (await enroll("agent-001")).status_code == 201
+    over = await enroll("agent-002")
+    assert over.status_code == 402 and "limit" in over.json()["detail"]
+    assert (await enroll("agent-001")).status_code == 201  # re-enroll existing agent is not a new seat

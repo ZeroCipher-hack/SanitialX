@@ -100,3 +100,18 @@ def load_license(path: str, public_key_b64: str, now: datetime | None = None) ->
     except (OSError, ValueError):
         return LicenseStatus("INVALID", "License file is not valid JSON.")
     return verify_license(document, public_key_b64, now)
+
+
+def enrollment_block_reason(status: LicenseStatus, licensed_agents: int) -> str | None:
+    """Why a NEW agent may not be enrolled, or None if allowed.
+
+    Licensing is only enforced once a public key is configured, so development
+    installs stay unrestricted. Already-enrolled agents are never affected.
+    """
+    if status.state == "UNCONFIGURED":
+        return None
+    if status.state != "VALID":
+        return f"License {status.state.lower()}: {status.reason or 'cannot enroll new agents.'}"
+    if status.max_agents is not None and licensed_agents >= status.max_agents:
+        return f"Agent limit reached ({status.max_agents}). Upgrade the license to enroll more agents."
+    return None
