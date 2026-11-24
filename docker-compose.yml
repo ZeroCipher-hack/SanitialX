@@ -5,10 +5,11 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-sentinelx}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-sentinelx_password_change_me}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}
       POSTGRES_DB: ${POSTGRES_DB:-sentinelx}
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      # Bound to loopback only: reachable from this host for debugging, never from the network.
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -21,13 +22,16 @@ services:
     image: redis:7-alpine
     container_name: sentinelx-redis
     restart: unless-stopped
-    command: redis-server --appendonly yes
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD must be set in .env}
+    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD:?REDIS_PASSWORD must be set in .env}"]
     ports:
-      - "${REDIS_PORT:-6379}:6379"
+      # Bound to loopback only: reachable from this host for debugging, never from the network.
+      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
     volumes:
       - redis_data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD-SHELL", "redis-cli -a \"$${REDIS_PASSWORD}\" --no-auth-warning ping | grep -q PONG"]
       interval: 3s
       timeout: 3s
       retries: 5
@@ -41,7 +45,7 @@ services:
     env_file:
       - ./backend/.env
     environment:
-      SENTINELX_DATABASE_URL: ${SENTINELX_DATABASE_URL:-postgresql+asyncpg://sentinelx:sentinelx_password_change_me@postgres:5432/sentinelx}
+      SENTINELX_DATABASE_URL: ${SENTINELX_DATABASE_URL:-postgresql+asyncpg://${POSTGRES_USER:-sentinelx}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-sentinelx}}
       SENTINELX_API_KEY: ${SENTINELX_API_KEY:?SENTINELX_API_KEY must be set in .env}
       SENTINELX_JWT_SECRET_KEY: ${SENTINELX_JWT_SECRET_KEY:?SENTINELX_JWT_SECRET_KEY must be set in .env}
     depends_on:
@@ -63,8 +67,8 @@ services:
       SENTINELX_APP_NAME: ${SENTINELX_APP_NAME:-SentinelX}
       SENTINELX_ENVIRONMENT: ${SENTINELX_ENVIRONMENT:-production}
       SENTINELX_LOG_LEVEL: ${SENTINELX_LOG_LEVEL:-INFO}
-      SENTINELX_REDIS_URL: ${SENTINELX_REDIS_URL:-redis://redis:6379/0}
-      SENTINELX_DATABASE_URL: ${SENTINELX_DATABASE_URL:-postgresql+asyncpg://sentinelx:sentinelx_password_change_me@postgres:5432/sentinelx}
+      SENTINELX_REDIS_URL: ${SENTINELX_REDIS_URL:-redis://:${REDIS_PASSWORD}@redis:6379/0}
+      SENTINELX_DATABASE_URL: ${SENTINELX_DATABASE_URL:-postgresql+asyncpg://${POSTGRES_USER:-sentinelx}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-sentinelx}}
       SENTINELX_API_HOST: 0.0.0.0
       SENTINELX_API_PORT: 8000
       SENTINELX_API_KEY: ${SENTINELX_API_KEY:?SENTINELX_API_KEY must be set in .env}
@@ -91,8 +95,8 @@ services:
       SENTINELX_APP_NAME: ${SENTINELX_APP_NAME:-SentinelX}
       SENTINELX_ENVIRONMENT: ${SENTINELX_ENVIRONMENT:-production}
       SENTINELX_LOG_LEVEL: ${SENTINELX_LOG_LEVEL:-INFO}
-      SENTINELX_REDIS_URL: ${SENTINELX_REDIS_URL:-redis://redis:6379/0}
-      SENTINELX_DATABASE_URL: ${SENTINELX_DATABASE_URL:-postgresql+asyncpg://sentinelx:sentinelx_password_change_me@postgres:5432/sentinelx}
+      SENTINELX_REDIS_URL: ${SENTINELX_REDIS_URL:-redis://:${REDIS_PASSWORD}@redis:6379/0}
+      SENTINELX_DATABASE_URL: ${SENTINELX_DATABASE_URL:-postgresql+asyncpg://${POSTGRES_USER:-sentinelx}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-sentinelx}}
       SENTINELX_API_KEY: ${SENTINELX_API_KEY:?SENTINELX_API_KEY must be set in .env}
       SENTINELX_JWT_SECRET_KEY: ${SENTINELX_JWT_SECRET_KEY:?SENTINELX_JWT_SECRET_KEY must be set in .env}
     depends_on:
@@ -116,7 +120,7 @@ services:
       SENTINELX_APP_NAME: ${SENTINELX_APP_NAME:-SentinelX}
       SENTINELX_ENVIRONMENT: ${SENTINELX_ENVIRONMENT:-production}
       SENTINELX_LOG_LEVEL: ${SENTINELX_LOG_LEVEL:-INFO}
-      SENTINELX_DATABASE_URL: ${SENTINELX_DATABASE_URL:-postgresql+asyncpg://sentinelx:sentinelx_password_change_me@postgres:5432/sentinelx}
+      SENTINELX_DATABASE_URL: ${SENTINELX_DATABASE_URL:-postgresql+asyncpg://${POSTGRES_USER:-sentinelx}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-sentinelx}}
       SENTINELX_API_KEY: ${SENTINELX_API_KEY:?SENTINELX_API_KEY must be set in .env}
       SENTINELX_JWT_SECRET_KEY: ${SENTINELX_JWT_SECRET_KEY:?SENTINELX_JWT_SECRET_KEY must be set in .env}
       SENTINELX_VULNERABILITY_SYNC_INTERVAL_SECONDS: ${SENTINELX_VULNERABILITY_SYNC_INTERVAL_SECONDS:-3600}
